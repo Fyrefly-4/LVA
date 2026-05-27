@@ -1,0 +1,11 @@
+# 前端过滤
+node_modules/
+dist/
+.env.local
+.env.development.local
+
+# 后端过滤
+bin/
+obj/
+.vs/
+appsettings.Development.json
