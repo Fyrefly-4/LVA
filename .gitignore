@@ -1,11 +1,64 @@
-# 前端过滤
+# ====================== 前端 Vite / Vue3 忽略规则 ======================
+# 依赖包
 node_modules/
+
+# 包管理器锁文件
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Vite 编译产物
 dist/
+dist-ssr/
+*.local
+
+# 环境变量（所有本地环境配置，防止密钥、接口地址泄露）
+.env
 .env.local
 .env.development.local
+.env.production.local
+.env.staging.local
 
-# 后端过滤
+# 前端日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ====================== .NET C# 后端 忽略规则 ======================
+# .NET 编译输出目录
 bin/
 obj/
+
+# Visual Studio 缓存 & 工作区
 .vs/
+*.user
+*.suo
+*.tmp
+
+# 多环境配置文件（含数据库连接、密钥，本地专用）
 appsettings.Development.json
+appsettings.Staging.json
+appsettings.Production.json
+
+# 后端发布文件夹
+publish/
+
+# 后端日志文件
+*.log
+
+# ====================== 通用：编辑器 / 系统 / 临时文件 ======================
+# VS Code 工作区配置
+.vscode/
+
+# 其他编辑器临时文件
+*.swp
+*.swo
+.idea/
+
+# Windows / Mac 系统文件
+Thumbs.db
+.DS_Store
+
+# 全局临时目录
+tmp/
+temp/
