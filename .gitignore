@@ -24,6 +24,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+#启动脚本
+dev-all.js
+
 # ====================== .NET C# 后端 忽略规则 ======================
 # .NET 编译输出目录
 bin/
