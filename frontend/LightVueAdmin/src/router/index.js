@@ -5,8 +5,17 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/login', component: () => import('@/views/login/index.vue') },
-    { path: '/dashboard', component: () => import('@/views/dashboard/index.vue')},
-    { path: '/', redirect: '/dashboard' }
+    {
+      path: '/',
+      component: () => import('@/layout/index.vue'),
+      redirect: '/dashboard',
+      children: [
+        {
+          path:'dashboard',
+          component: () => import('@/views/dashboard/index.vue')
+        }
+      ]
+    }
   ]
 })
 
@@ -19,7 +28,7 @@ router.beforeEach((to, from, next) => {
   
   if (token) {
     //有token已登录的情况
-    if (to.path === 'login') {
+    if (to.path === '/login') {
       next('/dashboard') //无需再进入登录页面
     } else {
       next() //放行
