@@ -25,7 +25,7 @@
             localStorage.setItem('token', data.token)
             ElMessage.success("登录成功")
             //路由跳转至首页
-            router.push('/')
+            router.push('/dashboard')
 
         } catch (error) {
             //
