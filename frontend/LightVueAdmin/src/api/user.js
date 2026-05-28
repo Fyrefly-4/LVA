@@ -11,3 +11,16 @@ export const getUserList = (params) => request({
     method: 'get',
     params
 })
+
+//单条增加用户
+export const addUser = (data) => request({
+    url: '/api/user',
+    method: 'post',
+    data //POST 请求提交的数据在data中
+})
+
+//单条删除用户
+export const deleteUser = (id) => request({
+    url: `/api/user/${id}`,
+    method: 'delete'
+})
