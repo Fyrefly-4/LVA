@@ -13,12 +13,19 @@ const router = createRouter({
       children: [
         {
           path: 'dashboard',
-          component: () => import('@/views/dashboard/index.vue')
+          component: () => import('@/views/dashboard/index.vue'),
+          meta: { title: '仪表盘' }
         },
         {
           path: 'user',
-          component: () => import('@/views/user/index.vue')
+          component: () => import('@/views/user/index.vue'),
+          meta: { title: '用户管理' }
         },
+        {
+          path: 'role',
+          component: () => import('@/views/role/index.vue'),
+          meta: { title: '角色管理' }
+        }
       ]
     }
   ]
