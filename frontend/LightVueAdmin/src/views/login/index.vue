@@ -48,7 +48,7 @@
                 </el-form-item>
                     
                 <el-form-item>
-                    <el-input v-model="form.password" type="password" placeholder="请输入密码" />
+                    <el-input v-model="form.password" type="password" @keyup.enter="onLogin" placeholder="请输入密码" />
                 </el-form-item>
                 
                 <el-button type="primary" style="width: 100%" @click="onLogin" >登录</el-button>

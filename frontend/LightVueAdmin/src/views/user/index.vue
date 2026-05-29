@@ -1,11 +1,19 @@
 <script setup>
 
-    import { ref, onMounted } from 'vue'
+    import { ref, reactive, onMounted } from 'vue'
     import { getUserList, addUser, updateUser, deleteUser } from '@/api/user'
     import { ElMessage, ElMessageBox } from 'element-plus';
 
     //储存表格数据
     const tableData = ref([])
+    const total = ref(0)
+
+    //分页请求参数
+    const queryParams = reactive({
+        pageIndex: 1,
+        pageSize: 10,
+        keyword: ''
+    })
 
     //控制弹窗dialog显示隐藏的开关，默认隐藏
     const dialogVisible = ref(false)
@@ -18,28 +26,46 @@
     //渲染表格
     const fetchUserList = async () => {
         try {
-            const res = await getUserList()
+            const res = await getUserList(queryParams)
 
-            //拦截器已剥离外壳
-            if(res && res.items) {
-                tableData.value = res.items
-                //ElMessage('用户数据加载成功')
-            } else {
-                //未剥离外壳
-                tableData.value = res.data?.items || []
-            }
+            tableData.value = res.items || []
+            total.value = res.total || 0
 
         } catch (error) {
             console.error('获取用户列表失败', error)
         }
     }
 
+    //点击搜索按钮
+    const handleSearch = () => {
+        queryParams.pageIndex = 1 //搜索时从第一页开始展示
+        fetchUserList()
+    }
+
+    //重置按钮点击
+    const handleReset = () => {
+        queryParams.keyword = ''
+        queryParams.pageIndex = 1
+        queryParams.pageSize = 10
+        fetchUserList()
+    }
+
+    //页数改变
+    const handleSizeChange = (val) => {
+        queryParams.pageSize = val
+        queryParams.pageIndex = 1
+        fetchUserList()
+    }
+
+    const handleCurrentChange = (val) => {
+        queryParams.pageIndex = val
+        fetchUserList()
+    }
+
     //页面挂载时调用
     onMounted(() => {
         fetchUserList()
     })
-
-
 
     //收集表单数据
     const formModel = ref({
@@ -163,11 +189,15 @@
 
 <template>
 
-    <div class="user-container">
-        <h3 style="margin-bottom: 20px;">用户管理模块</h3>
+    <div class="user-container" style="padding: 20px;">
+        <!-- <h3 style="margin-bottom: 20px;">用户管理模块</h3> -->
         
-        <div style="margin-bottom: 15px;">
-            <el-button type="primary" @click="openAddDialog">添加用户</el-button>
+        <div class="search-bar" style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px">
+            <el-input v-model="queryParams.keyword" @keyup.enter="handleSearch" placeholder="请输入用户名/昵称/邮箱" style="width: 260px" clearable @clear="handleSearch"/>
+            <el-button type="primary" @click="handleSearch" >搜索</el-button>
+            <el-button @click="handleReset">重置</el-button>
+            
+            <el-button type="primary" style="margin-left: auto;" @click="openAddDialog">添加用户</el-button>
         </div>
 
         <el-table :data="tableData" style="width: 100%; border">
@@ -175,6 +205,15 @@
             <el-table-column prop="username" label="用户名" width="150"/>
             <el-table-column prop="nickname" label="昵称" width="150"/>            
             <el-table-column prop="email" label="邮箱" width="200"/>
+
+            <el-table-column prop="status" label="状态" width="100%" >
+                <template #default="scope">
+                    <el-tag :type="scope.row.status === 1 ? 'success' : 'danger' ">
+                        {{ scope.row.status === 1 ? '正常' : '禁用' }}
+                    </el-tag>
+                </template>
+            </el-table-column>
+
             <el-table-column prop="createTime" label="创建时间"/>
 
             <el-table-column label="操作" width="180" fixed="right">
@@ -189,6 +228,11 @@
                 </template>
             </el-table-column>
         </el-table>
+
+        <div class="pagination-container" style="margin-top: 20px; display: flex; justify-content: flex-end">
+            <el-pagination v-model:current-page="queryParams.pageIndex" v-model:page-size="queryParams.pageSize" :page-sizes="[5, 10, 20, 50]"
+                layout="total, sizes, prev, pager, next, jumper" :total="total" @size-change="handleSizeChange" @current-change="handleCurrentChange" />
+        </div>
 
         <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
             <el-form :model="formModel" label-width="80px">
@@ -209,7 +253,7 @@
             </el-form>
 
             <template #footer>
-                <span class="dialog"-footer>
+                <span class="dialog-footer">
                     <el-button type="primary" @click="submitForm">确定</el-button>
                     <el-button @click="dialogVisible = false">取消</el-button>
                 </span>
@@ -221,7 +265,7 @@
 </template>
 
 <style scoped>
-    .uer-container {
+    .user-container {
         padding: 20px;
         background-color: #fff;
         border-radius: 4px;
