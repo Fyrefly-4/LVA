@@ -1,11 +1,19 @@
 <script setup>
 
     import { ref, onMounted } from 'vue'
-    import { getUserList, addUser, deleteUser } from '@/api/user'
+    import { getUserList, addUser, updateUser, deleteUser } from '@/api/user'
     import { ElMessage, ElMessageBox } from 'element-plus';
 
     //储存表格数据
     const tableData = ref([])
+
+    //控制弹窗dialog显示隐藏的开关，默认隐藏
+    const dialogVisible = ref(false)
+
+    //是否为编辑模式
+    const isEdit = ref(false)
+    //动态弹窗标题
+    const dialogTitle = ref('新增用户')
 
     //渲染表格
     const fetchUserList = async () => {
@@ -31,11 +39,11 @@
         fetchUserList()
     })
 
-    //控制弹窗dialog显示隐藏的开关，默认隐藏
-    const dialogVisible = ref(false)
+
 
     //收集表单数据
     const formModel = ref({
+        id: null,
         username: '',
         nickname: '',
         password: '',
@@ -46,8 +54,11 @@
 
     //添加用户
     const openAddDialog = () => {
-        //先清空表单
+        isEdit.value = false
+        dialogTitle.value = '新增用户'
+        //清空表单
         formModel.value = {
+            id: null,
             username: '',
             nickname: '',
             password: '',
@@ -59,20 +70,65 @@
         dialogVisible.value = true
     }
 
+    //点击编辑按钮
+    const openEditDialog = (row) => {
+        isEdit.value = true
+        dialogTitle.value =  '编辑用户'
+        //浅拷贝，把当前行的数据克隆给表单，防止表格被直接修改
+        formModel.value = { ...row }
+        //先清空前端表单的密码字段，使输入框“看起来是空的”
+        formModel.value.password = ''
+
+        //加上roleIds
+        if (row.roles && Array.isArray(row.roles)) {
+            formModel.value.roleIds = row.roles.map(item => {
+                return typeof item === 'object' ? item.id : item
+            })
+        } else if(!row.roleIds) {
+            formModel.value.roleIds = [2]
+        }
+
+        dialogVisible.value = true
+    }
+
     //点击“确定”按钮
     const submitForm = async () => {
         try {
-            //1.调用接口，发送表单数据至后端
-            await addUser(formModel.value)
-            
-            ElMessage.success("用户添加成功")
+            if(isEdit.value) {
+                //修改分支
+                //提纯roleIds
+                const cleanRoleIds = (formModel.value.roleIds || [2]).map(id => {
+                    const parsed = parseInt(id, 10)
+                    return isNaN(parsed) ? 2 : parsed // 如果解析失败，强行喂给它数字 2
+                })    
+                //对齐业务结构
+                const updatePayload = {
+                    nickname: formModel.value.nickname,
+                    email: formModel.value.email,
+                    status: formModel.value.status ?? 1,
+                    roleIds: cleanRoleIds
+                }
+                //只有当用户在输入框里真的敲了新密码，才带上 password 字段
+                if (formModel.value.password && formModel.value.password.trim() !=='') {
+                    updatePayload.password = formModel.value.password
+                }
+                //调用接口，发送表单数据至后端
+                await updateUser(formModel.value.id, updatePayload)
+
+                ElMessage.success('用户修改成功')
+            } else {
+                //新增分支
+                //调用接口，发送表单数据至后端
+                await addUser(formModel.value)
+                
+                ElMessage.success("用户添加成功")
+            }
 
             dialogVisible.value =false
-
             //调用函数，重新渲染表格
             fetchUserList()
         } catch(error) {    
-            console.log("添加用户失败", error)
+            console.log("操作失败", error)
         }
     }
 
@@ -121,8 +177,12 @@
             <el-table-column prop="email" label="邮箱" width="200"/>
             <el-table-column prop="createTime" label="创建时间"/>
 
-            <el-table-column label="操作" width="120" fixed="right">
+            <el-table-column label="操作" width="180" fixed="right">
                 <template #default="scope">
+                    <el-button type="primary" size="small" @click="openEditDialog(scope.row)">
+                        编辑
+                    </el-button>
+
                     <el-button type="danger" size="small" @click="handleDelete(scope.row)">
                         删除
                     </el-button>
@@ -130,16 +190,18 @@
             </el-table-column>
         </el-table>
 
-        <el-dialog v-model="dialogVisible" title="新建用户" width="500px">
+        <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px">
             <el-form :model="formModel" label-width="80px">
                 <el-form-item label="用户名">
-                    <el-input v-model="formModel.username" placeholder="请输入用户名" />
+                    <el-input v-model="formModel.username" :disabled="isEdit" placeholder="请输入用户名" />
                 </el-form-item>
                 <el-form-item label="昵称">
                     <el-input v-model="formModel.nickname" placeholder="请输入昵称" />
                 </el-form-item>
+                
                 <el-form-item label="密码">
-                    <el-input v-model="formModel.password" type="password" placeholder="请输入密码" />
+                    <el-input v-model="formModel.password" type="password" show-password
+                    :placeholder="isEdit ? '留空则不修改密码' : '请输入密码'" />
                 </el-form-item>
                 <el-form-item label="邮箱">
                     <el-input v-model="formModel.email" placeholder="请输入邮箱" />

@@ -19,6 +19,13 @@ export const addUser = (data) => request({
     data //POST 请求提交的数据在data中
 })
 
+//编辑用户
+export const updateUser = (id, data) => request({
+    url: `/api/user/${id}`,
+    method: 'put',
+    data //包含id和修改后的属性
+})
+
 //单条删除用户
 export const deleteUser = (id) => request({
     url: `/api/user/${id}`,
