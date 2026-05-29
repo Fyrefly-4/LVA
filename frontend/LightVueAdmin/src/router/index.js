@@ -1,5 +1,6 @@
 import { el } from 'element-plus/es/locale/index.mjs'
 import { createRouter, createWebHistory } from 'vue-router'
+import { forceCloseLoading } from '@/utils/request'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -27,6 +28,9 @@ const whiteList = ['/login', '/404'] //白名单
 
 //路由守卫
 router.beforeEach((to, from, next) => {
+  //切换路由时，关闭上一个页面可能残留的Loading
+  forceCloseLoading()
+
   //获取通行证
   const token = localStorage.getItem('token')
   

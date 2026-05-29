@@ -3,6 +3,7 @@
     import { ref, reactive, onMounted } from 'vue'
     import { getUserList, addUser, updateUser, deleteUser } from '@/api/user'
     import { ElMessage, ElMessageBox } from 'element-plus';
+    import { debounce, throttle } from '@/utils/tool';
 
     //储存表格数据
     const tableData = ref([])
@@ -118,7 +119,7 @@
     }
 
     //点击“确定”按钮
-    const submitForm = async () => {
+    const doSubmit = async () => {
         try {
             if(isEdit.value) {
                 //修改分支
@@ -157,6 +158,9 @@
             console.log("操作失败", error)
         }
     }
+
+    // 节流调用，1.5s CD
+    const submitForm = throttle(doSubmit, 1500)
 
     //删除用户
     const handleDelete = (row) => {
@@ -229,7 +233,7 @@
             </el-table-column>
         </el-table>
 
-        <div class="pagination-container" style="margin-top: 20px; display: flex; justify-content: flex-end">
+        <div class="pagination-container" >
             <el-pagination v-model:current-page="queryParams.pageIndex" v-model:page-size="queryParams.pageSize" :page-sizes="[5, 10, 20, 50]"
                 layout="total, sizes, prev, pager, next, jumper" :total="total" @size-change="handleSizeChange" @current-change="handleCurrentChange" />
         </div>
@@ -270,5 +274,11 @@
         background-color: #fff;
         border-radius: 4px;
         min-height: 200px;
+    }
+
+    .pagination-container{
+        margin-top: 20px; 
+        display: flex; 
+        justify-content: flex-end
     }
 </style>
