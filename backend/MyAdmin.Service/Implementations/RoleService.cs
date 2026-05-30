@@ -25,7 +25,7 @@ public class RoleService : IRoleService
         var total = await query.CountAsync();
 
         var items = await query
-            .OrderByDescending(r => r.CreateTime)
+            .OrderBy(r => r.Id)
             .Skip((pageIndex - 1) * pageSize)
             .Take(pageSize)
             .Select(r => new RoleDto

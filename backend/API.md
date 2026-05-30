@@ -126,6 +126,7 @@ Authorization: Bearer <token>
 | pageSize   | int    | 否   | 每页条数，默认 `10`            |
 | keyword    | string | 否   | 关键词（用户名/昵称/邮箱模糊） |
 
+- **排序规则**: `items` 按 `id` **升序**排列（`ORDER BY Id ASC`），便于前端表格稳定展示
 - **示例**: `GET /api/user/list?pageIndex=1&pageSize=10&keyword=张三`
 - **成功响应**:
 
@@ -227,6 +228,7 @@ Authorization: Bearer <token>
 | pageIndex | int  | 否   | 页码，默认 `1`      |
 | pageSize  | int  | 否   | 每页条数，默认 `10` |
 
+- **排序规则**: `items` 按 `id` **升序**排列（`ORDER BY Id ASC`），便于前端表格稳定展示
 - **示例**: `GET /api/role/list?pageIndex=1&pageSize=10`
 - **成功响应**:
 

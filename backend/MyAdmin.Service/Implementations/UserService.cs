@@ -37,7 +37,7 @@ public class UserService : IUserService
         var total = await query.CountAsync();
 
         var items = await query
-            .OrderByDescending(u => u.CreateTime)
+            .OrderBy(u => u.Id)
             .Skip((pageIndex - 1) * pageSize)
             .Take(pageSize)
             .Select(u => new UserDto
