@@ -194,7 +194,7 @@
 <template>
 
     <div class="user-container" style="padding: 20px;">
-        <!-- <h3 style="margin-bottom: 20px;">用户管理模块</h3> -->
+        <h3 style="font-weight: bold; font-size: 16px;">用户管理模块</h3>
         
         <div class="search-bar" style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px">
             <el-input v-model="queryParams.keyword" @keyup.enter="handleSearch" placeholder="请输入用户名/昵称/邮箱" style="width: 260px" clearable @clear="handleSearch"/>
