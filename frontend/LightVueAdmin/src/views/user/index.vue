@@ -1,7 +1,8 @@
 <script setup>
 
-    import { ref, reactive, onMounted } from 'vue'
+    import { ref, reactive, onMounted, nextTick } from 'vue'
     import { getUserList, addUser, updateUser, deleteUser } from '@/api/user'
+    import { getAllRoleList } from '@/api/role';
     import { ElMessage, ElMessageBox } from 'element-plus';
     import { debounce, throttle } from '@/utils/tool';
 
@@ -15,6 +16,9 @@
         pageSize: 10,
         keyword: ''
     })
+
+    //储存全量角色
+    const allRoles = ref([])
 
     //控制弹窗dialog显示隐藏的开关，默认隐藏
     const dialogVisible = ref(false)
@@ -34,6 +38,15 @@
 
         } catch (error) {
             console.error('获取用户列表失败', error)
+        }
+    }
+
+    const fetchAllRoles = async () => {
+        try {
+            const res = await getAllRoleList()
+            allRoles.value = res || [] 
+        } catch (error) {
+            console.log('加载角色字典失败', error)
         }
     }
 
@@ -66,6 +79,7 @@
     //页面挂载时调用
     onMounted(() => {
         fetchUserList()
+        fetchAllRoles()
     })
 
     //收集表单数据
@@ -98,55 +112,55 @@
     }
 
     //点击编辑按钮
-    const openEditDialog = (row) => {
+    const openEditDialog = async (row) => {
+        
         isEdit.value = true
         dialogTitle.value =  '编辑用户'
-        //浅拷贝，把当前行的数据克隆给表单，防止表格被直接修改
-        formModel.value = { ...row }
+
+        // 深拷贝 row 防止污染表格
+        formModel.value = JSON.parse(JSON.stringify(row))
+
         //先清空前端表单的密码字段，使输入框“看起来是空的”
         formModel.value.password = ''
 
-        //加上roleIds
+        // 映射 roleCode -> id，给 checkbox 自动勾选
         if (row.roles && Array.isArray(row.roles)) {
-            formModel.value.roleIds = row.roles.map(item => {
-                return typeof item === 'object' ? item.id : item
-            })
-        } else if(!row.roleIds) {
+            formModel.value.roleIds = allRoles.value
+                .filter(role => row.roles.includes(role.roleCode))
+                .map(role => role.id)
+        } else {
+            // 默认普通用户角色
             formModel.value.roleIds = [2]
         }
-
+        
         dialogVisible.value = true
     }
 
     //点击“确定”按钮
     const doSubmit = async () => {
         try {
+            const payload = {
+                nickname: formModel.value.nickname,
+                email: formModel.value.email,
+                status: formModel.value.status ?? 1,
+                roleIds: (formModel.value.roleIds || []).map(id => Number(id)) // 🔹改动
+            }
+            
             if(isEdit.value) {
                 //修改分支
-                //提纯roleIds
-                const cleanRoleIds = (formModel.value.roleIds || [2]).map(id => {
-                    const parsed = parseInt(id, 10)
-                    return isNaN(parsed) ? 2 : parsed // 如果解析失败，强行喂给它数字 2
-                })    
-                //对齐业务结构
-                const updatePayload = {
-                    nickname: formModel.value.nickname,
-                    email: formModel.value.email,
-                    status: formModel.value.status ?? 1,
-                    roleIds: cleanRoleIds
-                }
+                
                 //只有当用户在输入框里真的敲了新密码，才带上 password 字段
-                if (formModel.value.password && formModel.value.password.trim() !=='') {
-                    updatePayload.password = formModel.value.password
+                if (formModel.value.password && formModel.value.password.trim() !== '') {
+                    payload.password = formModel.value.password
                 }
                 //调用接口，发送表单数据至后端
-                await updateUser(formModel.value.id, updatePayload)
+                await updateUser(formModel.value.id, payload)
 
                 ElMessage.success('用户修改成功')
             } else {
                 //新增分支
                 //调用接口，发送表单数据至后端
-                await addUser(formModel.value)
+                await addUser({ ...formModel.value, roleIds: payload.roleIds })
                 
                 ElMessage.success("用户添加成功")
             }
@@ -253,6 +267,14 @@
                 </el-form-item>
                 <el-form-item label="邮箱">
                     <el-input v-model="formModel.email" placeholder="请输入邮箱" />
+                </el-form-item>
+
+                <el-form-item label="分配角色">
+                    <el-checkbox-group v-model="formModel.roleIds">
+                        <el-checkbox v-for="role in allRoles" :key="role.id" :value="role.id">
+                            {{ role.roleName }}
+                        </el-checkbox>
+                    </el-checkbox-group>
                 </el-form-item>
             </el-form>
 

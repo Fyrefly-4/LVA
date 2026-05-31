@@ -34,7 +34,7 @@ const router = createRouter({
 const whiteList = ['/login', '/404'] //白名单
 
 //路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, from) => {
   //切换路由时，关闭上一个页面可能残留的Loading
   forceCloseLoading()
 
@@ -44,16 +44,15 @@ router.beforeEach((to, from, next) => {
   if (token) {
     //有token已登录的情况
     if (to.path === '/login') {
-      next('/dashboard') //无需再进入登录页面
-    } else {
-      next() //放行
+      return '/dashboard' //无需再进入登录页面
     }
+    // 其他页面直接放行，无需写代码
   } else {
     //无token的情况
     if (whiteList.includes(to.path)) {
-      next() //位于白名单中的路由，放行
+      //位于白名单中的路由，放行
     } else {
-      next('/login') //重定向至登录页面
+      return '/login' //重定向至登录页面
     }
   }
 

@@ -76,8 +76,8 @@
     const openEditDialog = (row) => {
         isEdit.value = true
         dialogTitle.value =  '编辑角色'
-        //浅拷贝，把当前行的数据克隆给表单，防止表格被直接修改
-        formModel.value = { ...row }
+        //深拷贝
+        formModel.value = JSON.parse(JSON.stringify(row))
         dialogVisible.value = true
     }
 
@@ -127,6 +127,10 @@
             try {
                 await deleteRole(row.id)
                 ElMessage.success("删除成功")
+                
+                if (tableData.value.length === 1 && queryParams.pageIndex > 1) {
+                    queryParams.pageIndex--
+                }
                 fetchRoleList() //刷新列表
             } catch (error) {
                 console.log('删除失败:', error)
@@ -193,10 +197,10 @@
                     <el-input v-model="formModel.roleName" placeholder="请输入角色名称, 如: 高级管理员" />
                 </el-form-item>
                 <el-form-item label="角色编码">
-                    <el-input v-model="formModel.roleCode" :disabled="isEdit" placeholder="请输入角色编码, 如: admin" />
+                    <el-input v-model="formModel.roleCode" :readonly="isEdit" placeholder="请输入角色编码, 如: admin" />
                 </el-form-item>
                 <el-form-item label="描述说明">
-                    <el-input v-model="formModel.description" type="textarea" rows="3" placeholder="请输入该角色的权限或职责描述" />
+                    <el-input v-model="formModel.description" type="textarea" :rows="3" placeholder="请输入该角色的权限或职责描述" />
                 </el-form-item>
             </el-form>
 
