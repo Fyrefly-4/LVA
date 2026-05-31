@@ -20,8 +20,8 @@ public class RoleController : ControllerBase
 
     [HttpGet("list")]
     public async Task<ActionResult<ApiResponse<PagedResult<RoleDto>>>> GetList(
-        [FromQuery] int pageIndex = 1,
-        [FromQuery] int pageSize = 10)
+        [FromQuery] int? pageIndex = null,
+        [FromQuery] int? pageSize = null)
     {
         try
         {
@@ -31,6 +31,20 @@ public class RoleController : ControllerBase
         catch (Exception ex)
         {
             return Ok(ApiResponse<PagedResult<RoleDto>>.Fail(ex.Message));
+        }
+    }
+
+    [HttpGet("all")]
+    public async Task<ActionResult<ApiResponse<List<RoleDto>>>> GetAll()
+    {
+        try
+        {
+            var result = await _roleService.GetAllAsync();
+            return Ok(ApiResponse<List<RoleDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            return Ok(ApiResponse<List<RoleDto>>.Fail(ex.Message));
         }
     }
 

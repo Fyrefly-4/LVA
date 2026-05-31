@@ -16,18 +16,36 @@ public class RoleService : IRoleService
         _dbContext = dbContext;
     }
 
-    public async Task<PagedResult<RoleDto>> GetListAsync(int pageIndex, int pageSize)
+    public async Task<PagedResult<RoleDto>> GetListAsync(int? pageIndex, int? pageSize)
     {
-        pageIndex = pageIndex < 1 ? 1 : pageIndex;
-        pageSize = pageSize < 1 ? 10 : pageSize;
-
         var query = _dbContext.SysRoles.AsQueryable();
         var total = await query.CountAsync();
 
+        if (!pageIndex.HasValue && !pageSize.HasValue)
+        {
+            var allItems = await query
+                .OrderBy(r => r.Id)
+                .Select(r => new RoleDto
+                {
+                    Id = r.Id,
+                    RoleName = r.RoleName,
+                    RoleCode = r.RoleCode,
+                    Description = r.Description
+                })
+                .ToListAsync();
+
+            return new PagedResult<RoleDto> { Total = total, Items = allItems };
+        }
+
+        var actualPageIndex = pageIndex.GetValueOrDefault(1);
+        var actualPageSize = pageSize.GetValueOrDefault(10);
+        actualPageIndex = actualPageIndex < 1 ? 1 : actualPageIndex;
+        actualPageSize = actualPageSize < 1 ? 10 : actualPageSize;
+
         var items = await query
             .OrderBy(r => r.Id)
-            .Skip((pageIndex - 1) * pageSize)
-            .Take(pageSize)
+            .Skip((actualPageIndex - 1) * actualPageSize)
+            .Take(actualPageSize)
             .Select(r => new RoleDto
             {
                 Id = r.Id,
@@ -38,6 +56,20 @@ public class RoleService : IRoleService
             .ToListAsync();
 
         return new PagedResult<RoleDto> { Total = total, Items = items };
+    }
+
+    public async Task<List<RoleDto>> GetAllAsync()
+    {
+        return await _dbContext.SysRoles
+            .OrderBy(r => r.Id)
+            .Select(r => new RoleDto
+            {
+                Id = r.Id,
+                RoleName = r.RoleName,
+                RoleCode = r.RoleCode,
+                Description = r.Description
+            })
+            .ToListAsync();
     }
 
     public async Task CreateAsync(RoleSaveDto dto)

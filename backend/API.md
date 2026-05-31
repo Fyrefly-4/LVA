@@ -23,6 +23,9 @@
 | 403  | 无权限   |
 | 500  | 业务失败 |
 
+- 具体接口在发生异常时，会返回 `code` 和 `message`，`data` 可能为 `null`。
+- 例如，角色编码重复、资源不存在、权限不足等错误会通过业务 `code` 反馈。
+
 ### 认证方式
 
 除登录接口外，其余接口需在请求头携带 JWT：
@@ -107,7 +110,7 @@ Authorization: Bearer <token>
 }
 ```
 
-> 前端收到成功响应后清除本地 Token 即可（服务端无 Token 黑名单）。
+> 前端收到成功响应后清除本地 Token 即可。当前后端实现为无状态 JWT，不会在服务端记录或注销 Token，因此该接口仅用于前端清理本地认证信息。
 
 ---
 
@@ -218,18 +221,27 @@ Authorization: Bearer <token>
 
 > 以下接口均需认证。
 
-### 3.1 分页获取角色列表
+### 3.1 角色列表
+
+#### 3.1.1 分页获取角色列表
 
 - **URL**: `GET /api/role/list`
 - **Query 参数**:
 
-| 参数      | 类型 | 必填 | 说明                |
-|-----------|------|------|---------------------|
-| pageIndex | int  | 否   | 页码，默认 `1`      |
-| pageSize  | int  | 否   | 每页条数，默认 `10` |
+| 参数      | 类型 | 必填 | 说明                                   |
+|-----------|------|------|----------------------------------------|
+| pageIndex | int  | 否   | 页码，默认 `1`                          |
+| pageSize  | int  | 否   | 每页条数，默认 `10`                     |
 
-- **排序规则**: `items` 按 `id` **升序**排列（`ORDER BY Id ASC`），便于前端表格稳定展示
-- **示例**: `GET /api/role/list?pageIndex=1&pageSize=10`
+- **行为说明**:
+  - 当 `pageIndex` 和 `pageSize` 同时不传时，接口返回全量角色列表。
+  - 如果只传其中一个参数，则另一个参数会使用默认值：`pageIndex=1`、`pageSize=10`。
+  - `pageIndex` 小于 `1` 时会被自动修正为 `1`。
+  - `pageSize` 小于 `1` 时会被自动修正为 `10`。
+  - `items` 按 `id` **升序**排列（`ORDER BY Id ASC`），便于前端表格稳定展示。
+- **示例**:
+  - 获取第 1 页，10 条：`GET /api/role/list?pageIndex=1&pageSize=10`
+  - 获取全量角色：`GET /api/role/list`
 - **成功响应**:
 
 ```json
@@ -252,6 +264,32 @@ Authorization: Bearer <token>
 
 ---
 
+#### 3.1.2 全量获取角色列表
+
+- **URL**: `GET /api/role/all`
+- **认证**: 需要 Bearer Token
+- **说明**:
+  - 返回系统中全部角色，不分页。
+  - `items` 按 `id` 升序排列。
+- **成功响应**:
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 1,
+      "roleName": "管理员",
+      "roleCode": "admin",
+      "description": "系统高权限"
+    }
+  ]
+}
+```
+
+---
+
 ### 3.2 新增角色
 
 - **URL**: `POST /api/role`
@@ -265,6 +303,9 @@ Authorization: Bearer <token>
 }
 ```
 
+- **说明**:
+  - `roleCode` 必须全局唯一。
+  - 如果角色编码已存在，接口会返回错误信息 `角色编码已存在`。
 - **成功响应**: `data` 为 `null`
 
 ---
@@ -274,6 +315,9 @@ Authorization: Bearer <token>
 - **URL**: `PUT /api/role/{id}`
 - **请求体**: 同新增
 
+- **说明**:
+  - `roleCode` 必须全局唯一。
+  - 修改时如果指定的 `roleCode` 与其他角色冲突，会返回错误信息 `角色编码已存在`。
 - **成功响应**: `data` 为 `null`
 
 ---
