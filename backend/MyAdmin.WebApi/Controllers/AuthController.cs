@@ -39,7 +39,7 @@ public class AuthController : ControllerBase
     {
         var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!int.TryParse(userIdClaim, out var userId))
-            return Ok(ApiResponse<UserInfoDto>.Fail("未认证", 401));
+            return Ok(ApiResponse<UserInfoDto>.Fail("Unauthenticated", 401));
 
         try
         {
@@ -52,10 +52,52 @@ public class AuthController : ControllerBase
         }
     }
 
+    [HttpGet("menus")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<List<MenuTreeDto>>>> GetMenus()
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userIdClaim, out var userId))
+            return Ok(ApiResponse<List<MenuTreeDto>>.Fail("Unauthenticated", 401));
+
+        try
+        {
+            var flatMenus = await _authService.GetCurrentUserMenusAsync(userId);
+            var tree = BuildMenuTree(flatMenus, null);
+            return Ok(ApiResponse<List<MenuTreeDto>>.Success(tree));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Ok(ApiResponse<List<MenuTreeDto>>.Fail(ex.Message, 401));
+        }
+    }
+
     [HttpPost("logout")]
     [Authorize]
     public ActionResult<ApiResponse<object?>> Logout()
     {
         return Ok(ApiResponse<object?>.Success(null));
+    }
+
+    private static List<MenuTreeDto> BuildMenuTree(IEnumerable<MenuTreeDto> menus, int? parentId)
+    {
+        return menus
+            .Where(menu => menu.ParentId == parentId)
+            .OrderBy(menu => menu.Sort)
+            .ThenBy(menu => menu.Id)
+            .Select(menu => new MenuTreeDto
+            {
+                Id = menu.Id,
+                ParentId = menu.ParentId,
+                Title = menu.Title,
+                Path = menu.Path,
+                Component = menu.Component,
+                PermCode = menu.PermCode,
+                MenuType = menu.MenuType,
+                Icon = menu.Icon,
+                Sort = menu.Sort,
+                Children = BuildMenuTree(menus, menu.Id)
+            })
+            .ToList();
     }
 }

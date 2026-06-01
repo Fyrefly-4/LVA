@@ -6,4 +6,5 @@ public interface IAuthService
 {
     Task<LoginResponseDto> LoginAsync(LoginDto dto);
     Task<UserInfoDto> GetCurrentUserInfoAsync(int userId);
+    Task<List<MenuTreeDto>> GetCurrentUserMenusAsync(int userId);
 }

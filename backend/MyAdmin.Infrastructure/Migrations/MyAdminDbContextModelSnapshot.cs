@@ -17,10 +17,70 @@ namespace MyAdmin.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.11")
+                .HasAnnotation("ProductVersion", "8.0.18")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("MyAdmin.Core.Entities.SysMenu", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Component")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("CreateTime")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetime2")
+                        .HasDefaultValueSql("GETDATE()");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte>("MenuType")
+                        .HasColumnType("tinyint");
+
+                    b.Property<int?>("ParentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PermCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("Sort")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                    b.Property<byte>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("tinyint")
+                        .HasDefaultValue((byte)1);
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentId");
+
+                    b.HasIndex("PermCode");
+
+                    b.ToTable("SysMenu", (string)null);
+                });
 
             modelBuilder.Entity("MyAdmin.Core.Entities.SysRole", b =>
                 {
@@ -55,6 +115,21 @@ namespace MyAdmin.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("SysRole", (string)null);
+                });
+
+            modelBuilder.Entity("MyAdmin.Core.Entities.SysRoleMenu", b =>
+                {
+                    b.Property<int>("RoleId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("MenuId")
+                        .HasColumnType("int");
+
+                    b.HasKey("RoleId", "MenuId");
+
+                    b.HasIndex("MenuId");
+
+                    b.ToTable("SysRoleMenu", (string)null);
                 });
 
             modelBuilder.Entity("MyAdmin.Core.Entities.SysUser", b =>
@@ -117,6 +192,35 @@ namespace MyAdmin.Infrastructure.Migrations
                     b.ToTable("SysUserRole", (string)null);
                 });
 
+            modelBuilder.Entity("MyAdmin.Core.Entities.SysMenu", b =>
+                {
+                    b.HasOne("MyAdmin.Core.Entities.SysMenu", "Parent")
+                        .WithMany("Children")
+                        .HasForeignKey("ParentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("MyAdmin.Core.Entities.SysRoleMenu", b =>
+                {
+                    b.HasOne("MyAdmin.Core.Entities.SysMenu", "Menu")
+                        .WithMany("RoleMenus")
+                        .HasForeignKey("MenuId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MyAdmin.Core.Entities.SysRole", "Role")
+                        .WithMany("RoleMenus")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Menu");
+
+                    b.Navigation("Role");
+                });
+
             modelBuilder.Entity("MyAdmin.Core.Entities.SysUserRole", b =>
                 {
                     b.HasOne("MyAdmin.Core.Entities.SysRole", "Role")
@@ -136,8 +240,17 @@ namespace MyAdmin.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MyAdmin.Core.Entities.SysMenu", b =>
+                {
+                    b.Navigation("Children");
+
+                    b.Navigation("RoleMenus");
+                });
+
             modelBuilder.Entity("MyAdmin.Core.Entities.SysRole", b =>
                 {
+                    b.Navigation("RoleMenus");
+
                     b.Navigation("UserRoles");
                 });
 

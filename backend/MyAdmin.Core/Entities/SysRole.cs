@@ -9,4 +9,5 @@ public class SysRole
     public DateTime CreateTime { get; set; }
 
     public ICollection<SysUserRole> UserRoles { get; set; } = new List<SysUserRole>();
+    public ICollection<SysRoleMenu> RoleMenus { get; set; } = new List<SysRoleMenu>();
 }

@@ -89,14 +89,92 @@ Authorization: Bearer <token>
     "userId": 1,
     "username": "admin",
     "nickname": "超级管理员",
-    "roles": ["admin"]
+    "roles": ["admin"],
+    "permissions": ["sys:user:add", "sys:user:delete", "sys:user:edit", "sys:role:add"]
   }
 }
 ```
 
+> - `roles`：当前用户的角色编码列表（去重、按字母排序）
+> - `permissions`：当前用户通过所有关联角色拥有的全部有效权限码列表（去重、按字母排序）。权限码来源于 `SysMenu` 表中 `PermCode` 非空且启用的菜单项，通过 `SysUserRole -> SysRoleMenu -> SysMenu` 关联链路汇总。
+
 ---
 
-### 1.3 退出登录
+### 1.3 获取当前用户菜单树
+
+- **URL**: `GET /api/auth/menus`
+- **认证**: 需要 Bearer Token
+- **说明**:
+  - 返回当前登录用户可访问的菜单树形结构
+  - 仅包含 `MenuType = 0`（目录）和 `MenuType = 1`（菜单）的启用菜单，不包含按钮类型（`MenuType = 2`）
+  - 后端递归组装为树形结构，同一层按 `sort` 升序、`id` 升序排列
+  - 菜单项通过 `SysUserRole -> SysRoleMenu -> SysMenu` 关联链路获取，自动去重
+- **成功响应**:
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": [
+    {
+      "id": 1,
+      "parentId": null,
+      "title": "系统管理",
+      "path": "/system",
+      "component": null,
+      "permCode": null,
+      "menuType": 0,
+      "icon": "setting",
+      "sort": 1,
+      "children": [
+        {
+          "id": 2,
+          "parentId": 1,
+          "title": "用户管理",
+          "path": "/system/user",
+          "component": "system/user/index",
+          "permCode": "sys:user:list",
+          "menuType": 1,
+          "icon": "user",
+          "sort": 1,
+          "children": []
+        },
+        {
+          "id": 3,
+          "parentId": 1,
+          "title": "角色管理",
+          "path": "/system/role",
+          "component": "system/role/index",
+          "permCode": "sys:role:list",
+          "menuType": 1,
+          "icon": "peoples",
+          "sort": 2,
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+```
+
+`MenuTreeDto` 字段说明：
+
+| 字段       | 类型             | 说明                                           |
+|------------|------------------|------------------------------------------------|
+| id         | int              | 菜单 ID                                        |
+| parentId   | int?             | 父级菜单 ID，顶级菜单为 `null`                  |
+| title      | string           | 菜单标题                                       |
+| path       | string           | 路由路径                                       |
+| component  | string?          | 前端组件路径，目录类型可为 `null`               |
+| permCode   | string?          | 权限码标识，目录类型可为 `null`                 |
+| menuType   | byte             | 菜单类型：`0` 目录，`1` 菜单                    |
+| icon       | string?          | 图标名称                                       |
+| sort       | int              | 排序权重，值越小越靠前                          |
+| children   | MenuTreeDto[]    | 子菜单列表                                     |
+
+---
+
+### 1.4 退出登录
 
 - **URL**: `POST /api/auth/logout`
 - **认证**: 需要 Bearer Token
@@ -329,7 +407,41 @@ Authorization: Bearer <token>
 
 ---
 
-## 4. 默认种子数据
+## 4. 接口级权限控制
+
+项目提供 `[HasPermission]` 自定义属性，用于对接口进行细粒度权限校验。
+
+### 使用方式
+
+在 Controller 方法上标注权限码：
+
+```csharp
+[HasPermission("sys:user:delete")]
+public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
+```
+
+### 校验行为
+
+- 请求未认证（无有效 JWT）时，返回 HTTP `401`
+- 当前用户无对应权限码时，返回 HTTP `403`，body 为：
+
+```json
+{
+  "code": 403,
+  "message": "Forbidden",
+  "data": null
+}
+```
+
+- 校验通过则正常执行业务逻辑
+
+### 权限判定链路
+
+`SysUserRole -> SysRoleMenu -> SysMenu`，判断当前用户关联的所有角色是否拥有目标权限码（`SysMenu.PermCode`），且对应菜单需为启用状态（`Status = 1`）。
+
+---
+
+## 5. 默认种子数据
 
 首次启动时自动迁移数据库并写入：
 
@@ -341,7 +453,7 @@ Authorization: Bearer <token>
 
 ---
 
-## 5. 前端 Axios 示例
+## 6. 前端 Axios 示例
 
 ```typescript
 import axios from 'axios';

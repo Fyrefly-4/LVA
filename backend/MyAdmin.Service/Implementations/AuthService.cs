@@ -30,14 +30,18 @@ public class AuthService : IAuthService
             .FirstOrDefaultAsync(u => u.Username == dto.Username);
 
         if (user == null || user.Status != 1)
-            throw new UnauthorizedAccessException("用户名或密码错误");
+            throw new UnauthorizedAccessException("Username or password is incorrect.");
 
         if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-            throw new UnauthorizedAccessException("用户名或密码错误");
+            throw new UnauthorizedAccessException("Username or password is incorrect.");
 
-        var roleCodes = user.UserRoles.Select(ur => ur.Role.RoleCode).ToList();
+        var roleCodes = user.UserRoles
+            .Select(ur => ur.Role.RoleCode)
+            .Distinct()
+            .OrderBy(code => code)
+            .ToList();
+
         var token = GenerateToken(user, roleCodes);
-
         return new LoginResponseDto { Token = token };
     }
 
@@ -49,15 +53,64 @@ public class AuthService : IAuthService
             .FirstOrDefaultAsync(u => u.Id == userId);
 
         if (user == null)
-            throw new UnauthorizedAccessException("用户不存在或已失效");
+            throw new UnauthorizedAccessException("User does not exist or is inactive.");
+
+        var permissions = await (
+            from userRole in _dbContext.SysUserRoles
+            join roleMenu in _dbContext.SysRoleMenus on userRole.RoleId equals roleMenu.RoleId
+            join menu in _dbContext.SysMenus on roleMenu.MenuId equals menu.Id
+            where userRole.UserId == userId
+                  && menu.Status == 1
+                  && !string.IsNullOrWhiteSpace(menu.PermCode)
+            select menu.PermCode!)
+            .Distinct()
+            .OrderBy(code => code)
+            .ToListAsync();
 
         return new UserInfoDto
         {
             UserId = user.Id,
             Username = user.Username,
             Nickname = user.Nickname,
-            Roles = user.UserRoles.Select(ur => ur.Role.RoleCode).ToList()
+            Roles = user.UserRoles
+                .Select(ur => ur.Role.RoleCode)
+                .Distinct()
+                .OrderBy(code => code)
+                .ToList(),
+            Permissions = permissions
         };
+    }
+
+    public async Task<List<MenuTreeDto>> GetCurrentUserMenusAsync(int userId)
+    {
+        var menus = await (
+            from userRole in _dbContext.SysUserRoles
+            join roleMenu in _dbContext.SysRoleMenus on userRole.RoleId equals roleMenu.RoleId
+            join menu in _dbContext.SysMenus on roleMenu.MenuId equals menu.Id
+            where userRole.UserId == userId
+                  && menu.Status == 1
+                  && (menu.MenuType == 0 || menu.MenuType == 1)
+            orderby menu.Sort, menu.Id
+            select new MenuTreeDto
+            {
+                Id = menu.Id,
+                ParentId = menu.ParentId,
+                Title = menu.Title,
+                Path = menu.Path,
+                Component = menu.Component,
+                PermCode = menu.PermCode,
+                MenuType = menu.MenuType,
+                Icon = menu.Icon,
+                Sort = menu.Sort
+            })
+            .ToListAsync();
+
+        return menus
+            .GroupBy(menu => menu.Id)
+            .Select(group => group.First())
+            .OrderBy(menu => menu.Sort)
+            .ThenBy(menu => menu.Id)
+            .ToList();
     }
 
     private string GenerateToken(Core.Entities.SysUser user, List<string> roleCodes)
