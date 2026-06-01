@@ -97,8 +97,13 @@
                 ElMessage.success('角色修改成功')
             } else {
                 //新增分支
+                const addPayload = {
+                    roleName: formModel.value.roleName,
+                    roleCode: formModel.value.roleCode,
+                    description: formModel.value.description
+                }
                 //调用接口，发送表单数据至后端
-                await addRole(formModel.value)
+                await addRole(addPayload)
                 
                 ElMessage.success("角色添加成功")
             }
