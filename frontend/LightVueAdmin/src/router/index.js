@@ -46,11 +46,15 @@ router.beforeEach((to, from) => {
     if (to.path === '/login') {
       return '/dashboard' //无需再进入登录页面
     }
-    // 其他页面直接放行，无需写代码
+    // 其他页面直接放行
+    return true
+
   } else {
     //无token的情况
     if (whiteList.includes(to.path)) {
       //位于白名单中的路由，放行
+      return true
+
     } else {
       return '/login' //重定向至登录页面
     }

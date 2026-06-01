@@ -126,6 +126,31 @@ service.interceptors.response.use(
     if (error.config?.showLoading !== false) {
       endLoading()
     }
+
+    console.error('响应拦截器捕获到网络异常:', error)
+
+    // 判定后端服务没启动的核心防线（涵盖：无响应体，或者 Vite 代理返回的 502/504 状态码）
+    const isServerDown = !error.response || (error.response && [502, 504].includes(error.response.status))
+
+    if (isServerDown) {
+      ElMessage.error('无法连接到后端服务器，请检查后端服务是否启动！')
+      
+      // 强制清理本地脏 Token（解除伪登录）
+      localStorage.removeItem('token')
+      
+      // 强行重定向到登录页
+      router.push('/login')
+      
+      return Promise.reject(error)
+    }
+
+    // 后端虽然开着，但直接返回了 401 Unauthorized (比如密钥伪造、被后端清空)
+    if (error.response.status === 401) {
+      ElMessage.error('登录凭证已过期或失效，请重新登录')
+      localStorage.removeItem('token')
+      router.push('/login')
+      return Promise.reject(error)
+    }
     
     ElMessage.error(error.message || '网络连接失败')
     return Promise.reject(error)
