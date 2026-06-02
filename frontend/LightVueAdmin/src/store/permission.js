@@ -11,6 +11,10 @@ function loadView(component) {
 
     //补全后端路径，匹配vite的glob模式
     const fullPath = `/src/${component}`
+    
+console.log('后端返回:', component)
+    console.log('匹配路径:', fullPath)
+    console.log('是否存在:', !!modules[fullPath])
 
     if (modules[fullPath]) {
         return modules[fullPath]

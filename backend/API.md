@@ -90,7 +90,7 @@ Authorization: Bearer <token>
     "username": "admin",
     "nickname": "超级管理员",
     "roles": ["admin"],
-    "permissions": ["sys:user:add", "sys:user:delete", "sys:user:edit", "sys:role:add"]
+    "permissions": ["system:role:create", "system:role:delete", "system:role:list", "system:user:create", "system:user:delete", "system:user:list"]
   }
 }
 ```
@@ -121,7 +121,7 @@ Authorization: Bearer <token>
       "parentId": null,
       "title": "系统管理",
       "path": "/system",
-      "component": null,
+      "component": "Layout",
       "permCode": null,
       "menuType": 0,
       "icon": "setting",
@@ -131,9 +131,9 @@ Authorization: Bearer <token>
           "id": 2,
           "parentId": 1,
           "title": "用户管理",
-          "path": "/system/user",
-          "component": "system/user/index",
-          "permCode": "sys:user:list",
+          "path": "user",
+          "component": "views/user/index.vue",
+          "permCode": "system:user:list",
           "menuType": 1,
           "icon": "user",
           "sort": 1,
@@ -143,9 +143,9 @@ Authorization: Bearer <token>
           "id": 3,
           "parentId": 1,
           "title": "角色管理",
-          "path": "/system/role",
-          "component": "system/role/index",
-          "permCode": "sys:role:list",
+          "path": "role",
+          "component": "views/role/index.vue",
+          "permCode": "system:role:list",
           "menuType": 1,
           "icon": "peoples",
           "sort": 2,
@@ -416,7 +416,7 @@ Authorization: Bearer <token>
 在 Controller 方法上标注权限码：
 
 ```csharp
-[HasPermission("sys:user:delete")]
+[HasPermission("system:user:delete")]
 public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 ```
 
@@ -443,13 +443,43 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 
 ## 5. 默认种子数据
 
-首次启动时自动迁移数据库并写入：
+`DbInitializer.SeedAsync()` 在首次启动时通过 `EnsureDeletedAsync()` + `EnsureCreatedAsync()` 物理重建数据库后注入：
 
-| 类型 | 值 |
+### 用户
+
+| 字段 | 值 |
 |------|-----|
-| 管理员账号 | `admin` / `password123` |
-| 管理员角色 | `admin`（管理员） |
-| 普通用户角色 | `user`（普通用户） |
+| 用户名 | `admin` |
+| 密码 | `password123`（BCrypt 哈希存储） |
+| 昵称 | `超级管理员` |
+| 邮箱 | `admin@example.com` |
+| 状态 | `1`（正常） |
+
+### 角色
+
+| RoleName | RoleCode | Description |
+|----------|----------|-------------|
+| 管理员 | `admin` | 超级管理员 |
+| 普通用户 | `user` | 普通用户 |
+
+### 菜单权限树（共 7 条）
+
+| 层级 | Title | Path | Component | PermCode | MenuType | ParentId |
+|------|-------|------|-----------|----------|----------|----------|
+| 目录 | 系统管理 | `/system` | `Layout` | - | 0 | `null`（根节点） |
+| 菜单 | 用户管理 | `user` | `system/user/index` | `system:user:list` | 1 | 系统管理.Id |
+| 菜单 | 角色管理 | `role` | `system/role/index` | `system:role:list` | 1 | 系统管理.Id |
+| 按钮 | 用户新增 | - | - | `system:user:create` | 2 | 用户管理.Id |
+| 按钮 | 用户删除 | - | - | `system:user:delete` | 2 | 用户管理.Id |
+| 按钮 | 角色新增 | - | - | `system:role:create` | 2 | 角色管理.Id |
+| 按钮 | 角色删除 | - | - | `system:role:delete` | 2 | 角色管理.Id |
+
+> 根节点 `ParentId = null`（非 `0`），因为 `SysMenu` 表存在自关联外键约束，`ParentId = 0` 会触发 FK 冲突。
+
+### 关联绑定
+
+- **用户角色**：`admin` 用户 ↔ `admin` 角色
+- **角色菜单**：`admin` 角色 ↔ 上述全部 7 条菜单/按钮（管理员拥有全栈权限）
 
 ---
 

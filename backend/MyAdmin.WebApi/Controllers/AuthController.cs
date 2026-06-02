@@ -63,7 +63,7 @@ public class AuthController : ControllerBase
         try
         {
             var flatMenus = await _authService.GetCurrentUserMenusAsync(userId);
-            var tree = BuildMenuTree(flatMenus, 0);
+            var tree = BuildMenuTree(flatMenus, null);
             return Ok(ApiResponse<List<MenuTreeDto>>.Success(tree));
         }
         catch (UnauthorizedAccessException ex)
@@ -79,7 +79,7 @@ public class AuthController : ControllerBase
         return Ok(ApiResponse<object?>.Success(null));
     }
 
-    private static List<MenuTreeDto> BuildMenuTree(IEnumerable<MenuTreeDto> menus, int parentId)
+    private static List<MenuTreeDto> BuildMenuTree(IEnumerable<MenuTreeDto> menus, int? parentId)
     {
         return menus
             .Where(menu => menu.ParentId == parentId)

@@ -127,8 +127,9 @@ public class UserService : IUserService
     private async Task ValidateRoleIdsAsync(IEnumerable<int> roleIds)
     {
         var idList = roleIds.Distinct().ToList();
+        // 允许不分配角色（空数组直接跳过校验）
         if (idList.Count == 0)
-            throw new InvalidOperationException("至少分配一个角色");
+            return;
 
         var existingCount = await _dbContext.SysRoles.CountAsync(r => idList.Contains(r.Id));
         if (existingCount != idList.Count)
