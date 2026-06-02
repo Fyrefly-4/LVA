@@ -220,8 +220,8 @@
 
         <el-table :data="tableData" style="width: 100%; border">
             <el-table-column prop="id" label="ID" width="80"/>
-            <el-table-column prop="username" label="用户名" width="150"/>
-            <el-table-column prop="nickname" label="昵称" width="150"/>            
+            <el-table-column prop="username" label="用户名" width="150" show-overflow-tooltip/>
+            <el-table-column prop="nickname" label="昵称" width="150" show-overflow-tooltip/>            
             <el-table-column prop="email" label="邮箱" width="200"/>
 
             <el-table-column prop="status" label="状态" width="100%" >

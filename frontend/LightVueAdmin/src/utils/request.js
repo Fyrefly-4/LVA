@@ -113,11 +113,31 @@ service.interceptors.response.use(
     if (code === 200) return data
     
     // 业务失败提示
-    ElMessage.error(message || '系统异常')
-    if (code === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+    let errorMsg = message || '系统异常'
+    switch (code) {
+      case 400:
+        errorMsg = '请求参数错误'
+        break
+
+      case 401:
+        if (window.location.pathname === '/login') {
+          errorMsg = '用户名或密码错误'
+        } else {
+          errorMsg = '登录凭证已过期，请重新登录'
+          redirectToLogin()
+        }
+        break
+
+      case 403:
+        errorMsg = '您没有权限执行当前操作'
+        break
+
+      case 500:
+        errorMsg = '服务器内部错误'
+        break
     }
+
+    ElMessage.error(errorMsg)
     return Promise.reject(new Error(message || 'Error'))
   },
   (error) => {
@@ -144,16 +164,39 @@ service.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 后端虽然开着，但直接返回了 401 Unauthorized (比如密钥伪造、被后端清空)
-    if (error.response.status === 401) {
-      ElMessage.error('登录凭证已过期或失效，请重新登录')
-      localStorage.removeItem('token')
-      router.push('/login')
+    // 后端虽然开着，但直接返回了非200的 HTTP 状态码
+    if (error.response) {
+      const status = error.response.status
+      let errorMsg = ''
+
+      switch (status) {
+        case 400:
+          errorMsg = '请求参数错误 (400)'
+          break
+
+        case 401:
+          redirectToLogin()
+          return Promise.reject(error)
+
+        case 403:
+          errorMsg = '拒绝访问：您没有当前操作权限 (403)'
+          break
+
+        case 404:
+          errorMsg = '请求的资源不存在或路径错误 (404)'
+          break
+
+        case 500:
+          errorMsg = '服务器内部发生错误，请联系管理员 (500)'
+          break
+
+        default:
+          errorMsg = `网络异动，状态码：${status}`
+      }
+
+      ElMessage.error(errorMsg)
       return Promise.reject(error)
     }
-    
-    ElMessage.error(error.message || '网络连接失败')
-    return Promise.reject(error)
   }
 )
 

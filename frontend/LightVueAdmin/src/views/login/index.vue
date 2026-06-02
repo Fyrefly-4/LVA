@@ -35,7 +35,7 @@
             router.push('/dashboard')
 
         } catch (error) {
-            ElMessage.error("登录失败，请检查账号和密码")
+           console.error("登录阶段拦截到已知业务失败，拦截器已处理弹窗。")
         }
 
     }

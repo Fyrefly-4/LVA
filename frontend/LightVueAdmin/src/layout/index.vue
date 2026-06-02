@@ -1,12 +1,21 @@
 <script setup>
 
+    import { computed } from 'vue'
     import { useRoute, useRouter } from 'vue-router'
     import { ElMessage } from 'element-plus'
+    import usePermissionStore from '@/store/permission'
+    import sidebar from './components/Sidebar.vue'
+
 
     const router = useRouter()
+    const route = useRoute()
+    const permissionStore = usePermissionStore()
+
+    const nickname = computed(() => permissionStore.nickname || 管理员)
 
     const handleLogout = () => {
         localStorage.removeItem('token')
+        permissionStore.resetState()
         ElMessage.success('已退出登录')
         router.push('/login')
     }
@@ -26,54 +35,40 @@
                     LightVueAdmin 系统
                 </div>
 
-                <el-menu background-color="#304156" text-color="#fff" active-text-color="#ffd04b" 
-                router
-                >
-                    <el-menu-item index="/dashboard">
-                        <span>仪表盘</span>
-                    </el-menu-item>
-
-                    <el-menu-item index="/user">
-                        <span>用户管理</span>
-                    </el-menu-item>
-
-                    <el-menu-item index="/role">
-                        <span>角色管理</span>
-                    </el-menu-item>
-                </el-menu>
+                <sidebar />
 
             </el-aside>
 
-        <el-container>
-            <el-header style="background-color: #fff; border-bottom: 1px solid #dcdfe6;
-            display: flex; justify-content: space-between; align-items: center; height: 60px;"
-            >
+            <el-container>
+                <el-header style="background-color: #fff; border-bottom: 1px solid #dcdfe6;
+                display: flex; justify-content: space-between; align-items: center; height: 60px;"
+                >
 
-                <div style="font-size: 16px; font-weight: bold;">
-                    控制台首页
-                </div>
+                    <div style="font-size: 16px; font-weight: bold;">
+                        {{ route.meta.title || '控制台首页' }}
+                    </div>
 
-                <div>
-                    <el-dropdown>
-                        <span style="cursor: pointer; display: flex; align-items: center;">
-                            欢迎您，管理员
-                        </span>
+                    <div>
+                        <el-dropdown>
+                            <span style="cursor: pointer; display: flex; align-items: center;">
+                                欢迎您, {{ nickname }}
+                            </span>
 
-                        <template #dropdown>
-                            <el-dropdown-menu>
-                                <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
-                            </el-dropdown-menu>
-                        </template>
-                    </el-dropdown>
-                </div>
+                            <template #dropdown>
+                                <el-dropdown-menu>
+                                    <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
+                                </el-dropdown-menu>
+                            </template>
+                        </el-dropdown>
+                    </div>
 
-            </el-header>
+                </el-header>
 
-            <el-main style="background-color: #f0f2f5;">
-                <router-view />
-            </el-main>
+                <el-main style="background-color: #f0f2f5;">
+                    <router-view />
+                </el-main>
 
-        </el-container>
+            </el-container>
 
         </el-container>
     </div>
