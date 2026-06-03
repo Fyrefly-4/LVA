@@ -114,6 +114,7 @@ public class RoleController : ControllerBase
     /// 保存角色勾选的权限 MenuId 集合（请求体为平铺的 int 数组，不包 dto 壳）。
     /// </summary>
     [HttpPost("{id:int}/permissions")]
+    [HasPermission("system:role:assignPerm")]
     public async Task<ActionResult<ApiResponse<object?>>> SavePermissions(int id, [FromBody] List<int> menuIds)
     {
         try

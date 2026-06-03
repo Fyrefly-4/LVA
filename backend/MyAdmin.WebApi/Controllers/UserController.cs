@@ -52,6 +52,7 @@ public class UserController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [HasPermission("system:user:assignRole")]
     public async Task<ActionResult<ApiResponse<object?>>> Update(int id, [FromBody] UserSaveDto dto)
     {
         try

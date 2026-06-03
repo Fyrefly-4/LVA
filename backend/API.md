@@ -536,8 +536,10 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 接口 | 权限码 |
 |------|--------|
 | `POST /api/user` | `system:user:create` |
+| `PUT /api/user/{id}` | `system:user:assignRole` |
 | `DELETE /api/user/{id}` | `system:user:delete` |
 | `POST /api/role` | `system:role:create` |
+| `POST /api/role/{id}/permissions` | `system:role:assignPerm` |
 | `DELETE /api/role/{id}` | `system:role:delete` |
 
 ---
@@ -563,7 +565,7 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 管理员 | `admin` | 超级管理员 |
 | 普通用户 | `user` | 普通用户 |
 
-### 菜单权限树（共 7 条）
+### 菜单权限树（共 9 条）
 
 | 层级 | Title | Path | Component | PermCode | MenuType | ParentId |
 |------|-------|------|-----------|----------|----------|----------|
@@ -572,15 +574,17 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 菜单 | 角色管理 | `role` | `system/role/index` | `system:role:list` | 1 | 系统管理.Id |
 | 按钮 | 用户新增 | - | - | `system:user:create` | 2 | 用户管理.Id |
 | 按钮 | 用户删除 | - | - | `system:user:delete` | 2 | 用户管理.Id |
+| 按钮 | 分配角色 | - | - | `system:user:assignRole` | 2 | 用户管理.Id |
 | 按钮 | 角色新增 | - | - | `system:role:create` | 2 | 角色管理.Id |
 | 按钮 | 角色删除 | - | - | `system:role:delete` | 2 | 角色管理.Id |
+| 按钮 | 分配权限 | - | - | `system:role:assignPerm` | 2 | 角色管理.Id |
 
 > 根节点 `ParentId = null`（非 `0`），因为 `SysMenu` 表存在自关联外键约束，`ParentId = 0` 会触发 FK 冲突。
 
 ### 关联绑定
 
 - **用户角色**：`admin` 用户 ↔ `admin` 角色
-- **角色菜单**：`admin` 角色 ↔ 上述全部 7 条菜单/按钮（管理员拥有全栈权限）
+- **角色菜单**：`admin` 角色 ↔ 上述全部 9 条菜单/按钮（管理员拥有全栈权限）
 
 ---
 

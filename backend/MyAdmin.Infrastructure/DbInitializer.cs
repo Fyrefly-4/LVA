@@ -50,7 +50,7 @@ public static class DbInitializer
             Component = "Layout",
             ParentId = null,
             MenuType = 0,
-            Icon = "setting",
+            Icon = "Setting",
             Sort = 1,
             Status = 1,
             CreateTime = DateTime.Now
@@ -66,7 +66,7 @@ public static class DbInitializer
             Component = "views/user/index.vue",
             ParentId = systemMenu.Id, // 动态引用父级真实 Id
             MenuType = 1,
-            Icon = "user",
+            Icon = "User",
             PermCode = "system:user:list",
             Sort = 1,
             Status = 1,
@@ -83,7 +83,7 @@ public static class DbInitializer
             Component = "views/role/index.vue",
             ParentId = systemMenu.Id, // 动态引用父级真实 Id
             MenuType = 1,
-            Icon = "peoples",
+            Icon = "UserFilled",
             PermCode = "system:role:list",
             Sort = 2,
             Status = 1,
@@ -154,7 +154,39 @@ public static class DbInitializer
         context.SysMenus.AddRange(roleCreateBtn, roleDeleteBtn);
         await context.SaveChangesAsync(); // 获取两个按钮的 Id
 
-        // 收集全部 7 个菜单/按钮的 Id，用于后续角色绑定
+        // A6. 按钮级细粒度权限（MenuType = 2）- 用户管理 → 分配角色
+        var assignRoleBtn = new SysMenu
+        {
+            Title = "分配角色",
+            Path = "",
+            Component = "",
+            ParentId = userManageMenu.Id,
+            MenuType = 2,
+            Icon = "",
+            PermCode = "system:user:assignRole",
+            Sort = 3,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+
+        // A7. 按钮级细粒度权限（MenuType = 2）- 角色管理 → 分配权限
+        var assignPermBtn = new SysMenu
+        {
+            Title = "分配权限",
+            Path = "",
+            Component = "",
+            ParentId = roleManageMenu.Id,
+            MenuType = 2,
+            Icon = "",
+            PermCode = "system:role:assignPerm",
+            Sort = 3,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+        context.SysMenus.AddRange(assignRoleBtn, assignPermBtn);
+        await context.SaveChangesAsync(); // 获取两个按钮的 Id
+
+        // 收集全部 9 个菜单/按钮的 Id，用于后续角色绑定
         var allMenuIds = new List<int>
         {
             systemMenu.Id,
@@ -162,8 +194,10 @@ public static class DbInitializer
             roleManageMenu.Id,
             userCreateBtn.Id,
             userDeleteBtn.Id,
+            assignRoleBtn.Id,
             roleCreateBtn.Id,
-            roleDeleteBtn.Id
+            roleDeleteBtn.Id,
+            assignPermBtn.Id
         };
 
         // ==================== B. 初始角色 (SysRole) ====================
@@ -208,7 +242,7 @@ public static class DbInitializer
         });
         await context.SaveChangesAsync();
 
-        // D2. 角色菜单关联 (SysRoleMenu) - 将 admin 角色与全部 7 个菜单/按钮批量绑定
+        // D2. 角色菜单关联 (SysRoleMenu) - 将 admin 角色与全部 9 个菜单/按钮批量绑定
         // 确保管理员拥有全栈动态菜单渲染权与细粒度接口操作权（[HasPermission] 校验）
         var adminRoleMenus = allMenuIds.Select(menuId => new SysRoleMenu
         {

@@ -198,7 +198,7 @@
 - 物理删除旧库并重新建库（`EnsureDeletedAsync()` + `EnsureCreatedAsync()`，首次注入成功后已注释）
 - 注入完整 RBAC 种子数据：
 
-### 菜单权限树（7 条，利用 EF 上下文生命周期避免硬编码 Id）
+### 菜单权限树（9 条，利用 EF 上下文生命周期避免硬编码 Id）
 
 | 层级 | Title | PermCode | MenuType | 父级 |
 |------|-------|----------|----------|------|
@@ -207,8 +207,10 @@
 | 菜单 | 角色管理 | `system:role:list` | 1 | 系统管理 |
 | 按钮 | 用户新增 | `system:user:create` | 2 | 用户管理 |
 | 按钮 | 用户删除 | `system:user:delete` | 2 | 用户管理 |
+| 按钮 | 分配角色 | `system:user:assignRole` | 2 | 用户管理 |
 | 按钮 | 角色新增 | `system:role:create` | 2 | 角色管理 |
 | 按钮 | 角色删除 | `system:role:delete` | 2 | 角色管理 |
+| 按钮 | 分配权限 | `system:role:assignPerm` | 2 | 角色管理 |
 
 > 根节点 `ParentId = null`，因为 `SysMenu` 表存在自关联外键约束（`FK_SysMenu_SysMenu_ParentId`），`ParentId = 0` 会触发 FK 冲突。
 
@@ -224,7 +226,7 @@
 ### 关联绑定
 
 - **用户角色**：admin 用户 ↔ admin 角色
-- **角色菜单**：admin 角色 ↔ 全部 7 条菜单/按钮（管理员拥有全栈动态菜单渲染权与细粒度接口操作权）
+- **角色菜单**：admin 角色 ↔ 全部 9 条菜单/按钮（管理员拥有全栈动态菜单渲染权与细粒度接口操作权）
 
 ## 6. 重要结论
 
