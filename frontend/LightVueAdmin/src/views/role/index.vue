@@ -1,7 +1,8 @@
 <script setup>
 
-    import { ref, reactive, onMounted } from 'vue';
-    import { getRoleList, addRole, updateRole, deleteRole } from '@/api/role';
+    import { ref, reactive, onMounted, nextTick } from 'vue';
+    import { getRoleList, addRole, updateRole, deleteRole,
+             getRolePermissions, saveRolePermissions } from '@/api/role';
     import { ElMessage, ElMessageBox } from 'element-plus';
     import { debounce, throttle } from '@/utils/tool';
 
@@ -151,6 +152,93 @@
     // 节流调用，1.5s CD
     const submitForm = throttle(doSubmit, 1500)
 
+    // ==============权限分配相关代码================
+    const permDialogVisible = ref(false) //权限弹窗开关
+    const treeLoading = ref(false) //树组件加载Loading
+    const submitPermLoading = ref(false) //提交按钮Loading
+    const currentRole = ref({}) //当前操作的角色行
+    const menuTreeData = ref([]) //el-tree的全量菜单树数据源
+    const treeRef = ref(null)
+
+    //响应式开关
+    const isCheckStrictly = ref(false)
+    //打开权限分配弹窗并回显
+    const openPermDialog = async (row) => {
+        currentRole.value = row
+
+        //每次打开前，先把旧的勾选和树数据清空，防止残影闪烁
+        if (treeRef.value) {
+            treeRef.value.setCheckedKeys([])
+        }
+        menuTreeData.value = []
+
+        permDialogVisible.value = true
+        treeLoading.value = true
+        //解耦父子节点
+        isCheckStrictly.value = true
+
+        try{
+            //使用接口获取全量树与已经绑定的MenuId集合
+            const res = await getRolePermissions(row.id)
+
+            const targetData = res.data || res
+            menuTreeData.value = targetData.allMenus || []
+
+            //等待弹窗渲染完成再回显
+            nextTick(() => {
+                if (treeRef.value) {
+                    treeRef.value.setCheckedKeys(targetData.checkedMenuIds || [])
+
+                    nextTick(() => {
+                        //解除严格模式
+                        isCheckStrictly.value = false
+
+                        nextTick(() => {
+                            // 拿出被勾选的所有子节点id
+                            const checkedLeafKeys = treeRef.value.getCheckedKeys(true)
+                            // 重新放入，计算父节点选择
+                            treeRef.value.setCheckedKeys(checkedLeafKeys)
+                        })
+                    })
+                }
+            })
+
+        } catch (error) {
+            console.log('获取权限树失败', error)
+            ElMessage.error('获取权限分配数据失败')
+        } finally {
+            treeLoading.value = false
+        }
+    }
+
+    //确定保存权限分配结果
+    const doSavePermission = async () => {
+        if (!treeRef.value) return
+
+        const checkedKeys = treeRef.value.getCheckedKeys() //全选节点
+        const halfCheckedKeys = treeRef.value.getHalfCheckedKeys() // 半选父节点
+
+        //合并为数组
+        const finalMenuIds = [...checkedKeys, ...halfCheckedKeys]
+
+        submitPermLoading.value = true
+
+        try {
+            //使用接口将数据导入finalMenuIds数组
+            await saveRolePermissions(currentRole.value.id, finalMenuIds)
+            ElMessage.success('角色权限配置成功')
+            permDialogVisible.value = false
+
+        } catch (error) {
+            console.log('保存角色权限失败', error)
+        } finally {
+            submitPermLoading.value = false
+        }
+    }
+
+    // 节流调用，1.5s CD
+    const submitPermissionForm = throttle(doSavePermission, 1500)
+
 </script>
 
 <template>
@@ -164,7 +252,7 @@
                 </div>
             </template>
 
-            <el-table :data="tableData" stripe border style="width: 100%;">
+            <el-table :data="tableData" row-key="id" stripe border style="width: 100%;">
                 <el-table-column prop="id" label="角色ID" width="100" align="center"/>
                 <el-table-column prop="roleName" label="角色名称" width="180"/>
                 
@@ -176,10 +264,14 @@
 
                 <el-table-column prop="description" label="描述说明" min-width="250" show-overflow-tooltip />
 
-                <el-table-column label="操作" width="150" align="center" fixed="right" >
+                <el-table-column label="操作" width="230" align="center" fixed="right" >
                     <template #default="scope">
                         <el-button type="primary" size="small" @click="openEditDialog(scope.row)">
                             编辑
+                        </el-button>
+
+                        <el-button type="warning" size="small" @click="openPermDialog(scope.row)">
+                            分配权限
                         </el-button>
 
                         <el-button type="danger" size="small" @click="handleDelete(scope.row)">
@@ -211,8 +303,33 @@
 
             <template #footer>
                 <span class="dialog-footer">
-                    <el-button type="primary" @click="submitForm">确定</el-button>
-                    <el-button @click="dialogVisible = false">取消</el-button>
+                    <el-button type="primary" @click="submitForm">
+                        确定
+                    </el-button>
+
+                    <el-button @click="dialogVisible = false">
+                        取消
+                    </el-button>
+                </span>
+            </template>
+        </el-dialog>
+
+        <el-dialog v-model="permDialogVisible" :title="`为角色 [${currentRole.roleName}] 分配权限`" width="500px" destroy-on-close >
+            <div v-loading="treeLoading" style="max-height: 450px; overflow-y: auto; padding: 10px 20px;">
+                <el-tree ref="treeRef" :data="menuTreeData" show-checkbox :check-strictly="isCheckStrictly"
+                    node-key="id" default-expand-all :props="{ label: 'title', children: 'children' }"
+                />
+            </div>
+
+            <template #footer>
+                <span class="dialog-footer">
+                    <el-button type="primary" :loading="submitPermLoading" @click="submitPermissionForm">
+                        确定保存
+                    </el-button>
+
+                    <el-button @click="permDialogVisible = false">
+                        取消
+                    </el-button>
                 </span>
             </template>
         </el-dialog>

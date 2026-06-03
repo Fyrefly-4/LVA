@@ -58,3 +58,29 @@ export const deleteRole = (id) => {
         method: 'delete'
     })
 }
+
+/**
+ * 3.5 获取角色权限分配数据 (el-tree 回显)
+ * @param {number} id - 角色 ID
+ * @returns {Promise} - 返回权限树数据
+ */
+export const getRolePermissions = (id) => {
+    return request({
+        url: `/api/role/${id}/permissions`,
+        method: 'get'
+    })
+}
+
+/**
+ * 3.6 保存角色权限分配
+ * @param {number} id - 角色 ID
+ * @param {number[]} menuIds - 选中的菜单 ID 数组
+ * @return {Promise} - 返回保存结果
+ */
+export const saveRolePermissions = (id, menuIds) => {
+    return request({
+        url: `/api/role/${id}/permissions`,
+        method: 'post',
+        data: menuIds
+    })
+}
