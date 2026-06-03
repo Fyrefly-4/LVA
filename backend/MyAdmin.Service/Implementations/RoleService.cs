@@ -3,6 +3,7 @@ using MyAdmin.Core.Common;
 using MyAdmin.Core.Dtos;
 using MyAdmin.Core.Entities;
 using MyAdmin.Infrastructure;
+using MyAdmin.Service.Helpers;
 using MyAdmin.Service.Interfaces;
 
 namespace MyAdmin.Service.Implementations;
@@ -111,5 +112,91 @@ public class RoleService : IRoleService
 
         _dbContext.SysRoles.Remove(role);
         await _dbContext.SaveChangesAsync();
+    }
+
+    public async Task<RolePermissionDto> GetRolePermissionsAsync(int roleId)
+    {
+        var roleExists = await _dbContext.SysRoles.AnyAsync(r => r.Id == roleId);
+        if (!roleExists)
+            throw new InvalidOperationException("角色不存在");
+
+        var flatMenus = await _dbContext.SysMenus
+            .Where(m => m.Status == 1)
+            .OrderBy(m => m.Sort)
+            .ThenBy(m => m.Id)
+            .Select(m => new MenuTreeDto
+            {
+                Id = m.Id,
+                ParentId = m.ParentId,
+                Title = m.Title,
+                Path = m.Path,
+                Component = m.Component,
+                PermCode = m.PermCode,
+                MenuType = m.MenuType,
+                Icon = m.Icon,
+                Sort = m.Sort
+            })
+            .ToListAsync();
+
+        var checkedMenuIds = await _dbContext.SysRoleMenus
+            .Where(rm => rm.RoleId == roleId)
+            .Select(rm => rm.MenuId)
+            .OrderBy(menuId => menuId)
+            .ToListAsync();
+
+        return new RolePermissionDto
+        {
+            AllMenus = MenuTreeBuilder.Build(flatMenus),
+            CheckedMenuIds = checkedMenuIds
+        };
+    }
+
+    public async Task SaveRolePermissionsAsync(int roleId, List<int> menuIds)
+    {
+        var roleExists = await _dbContext.SysRoles.AnyAsync(r => r.Id == roleId);
+        if (!roleExists)
+            throw new InvalidOperationException("角色不存在");
+
+        var distinctMenuIds = (menuIds ?? new List<int>()).Distinct().ToList();
+
+        if (distinctMenuIds.Count > 0)
+        {
+            var validMenuIds = await _dbContext.SysMenus
+                .Where(m => m.Status == 1 && distinctMenuIds.Contains(m.Id))
+                .Select(m => m.Id)
+                .ToListAsync();
+
+            if (validMenuIds.Count != distinctMenuIds.Count)
+                throw new InvalidOperationException("存在无效或已禁用的菜单/按钮 ID");
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        try
+        {
+            var existing = await _dbContext.SysRoleMenus
+                .Where(rm => rm.RoleId == roleId)
+                .ToListAsync();
+
+            if (existing.Count > 0)
+                _dbContext.SysRoleMenus.RemoveRange(existing);
+
+            if (distinctMenuIds.Count > 0)
+            {
+                var newBindings = distinctMenuIds.Select(menuId => new SysRoleMenu
+                {
+                    RoleId = roleId,
+                    MenuId = menuId
+                });
+                await _dbContext.SysRoleMenus.AddRangeAsync(newBindings);
+            }
+
+            await _dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 }

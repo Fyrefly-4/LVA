@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MyAdmin.Core.Common;
 using MyAdmin.Core.Dtos;
 using MyAdmin.Service.Interfaces;
+using MyAdmin.WebApi.Attributes;
 
 namespace MyAdmin.WebApi.Controllers;
 
@@ -49,6 +50,7 @@ public class RoleController : ControllerBase
     }
 
     [HttpPost]
+    [HasPermission("system:role:create")]
     public async Task<ActionResult<ApiResponse<object?>>> Create([FromBody] RoleSaveDto dto)
     {
         try
@@ -77,11 +79,46 @@ public class RoleController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [HasPermission("system:role:delete")]
     public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
     {
         try
         {
             await _roleService.DeleteAsync(id);
+            return Ok(ApiResponse<object?>.Success(null));
+        }
+        catch (Exception ex)
+        {
+            return Ok(ApiResponse<object?>.Fail(ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// 获取全量菜单树及当前角色已勾选的 MenuId（el-tree 赋权回显）。
+    /// </summary>
+    [HttpGet("{id:int}/permissions")]
+    public async Task<ActionResult<ApiResponse<RolePermissionDto>>> GetPermissions(int id)
+    {
+        try
+        {
+            var result = await _roleService.GetRolePermissionsAsync(id);
+            return Ok(ApiResponse<RolePermissionDto>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            return Ok(ApiResponse<RolePermissionDto>.Fail(ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// 保存角色勾选的权限 MenuId 集合（请求体为平铺的 int 数组，不包 dto 壳）。
+    /// </summary>
+    [HttpPost("{id:int}/permissions")]
+    public async Task<ActionResult<ApiResponse<object?>>> SavePermissions(int id, [FromBody] List<int> menuIds)
+    {
+        try
+        {
+            await _roleService.SaveRolePermissionsAsync(id, menuIds ?? new List<int>());
             return Ok(ApiResponse<object?>.Success(null));
         }
         catch (Exception ex)

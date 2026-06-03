@@ -118,6 +118,10 @@
   - 修改角色
 - `DELETE /api/role/{id}`
   - 删除角色
+- `GET /api/role/{id}/permissions`
+  - 获取全量菜单树 + 当前角色已勾选 MenuId（`RolePermissionDto`）
+- `POST /api/role/{id}/permissions`
+  - 保存角色权限，请求体为平铺 `List<int>` menuIds（不包 dto 壳）
 
 `MyAdmin.Service/Implementations/RoleService.cs`
 - `GetListAsync(int? pageIndex, int? pageSize)`
@@ -130,6 +134,15 @@
   - 校验修改后的 `RoleCode` 不冲突
 - `DeleteAsync(int id)`
   - 删除角色
+- `GetRolePermissionsAsync(int roleId)`
+  - 查询 `Status = 1` 的全量菜单并递归为 `AllMenus`
+  - 查询 `SysRoleMenu` 得到 `CheckedMenuIds`
+- `SaveRolePermissionsAsync(int roleId, List<int> menuIds)`
+  - 事务内先删后插同步 `SysRoleMenu`，支持空数组清空
+
+`RolePermissionDto` 字段：
+- `allMenus`：`List<MenuTreeDto>`
+- `checkedMenuIds`：`List<int>`
 
 `RoleDto` 字段：
 - `id`, `roleName`, `roleCode`, `description`

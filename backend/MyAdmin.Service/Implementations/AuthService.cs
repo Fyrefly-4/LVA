@@ -55,6 +55,7 @@ public class AuthService : IAuthService
         if (user == null)
             throw new UnauthorizedAccessException("User does not exist or is inactive.");
 
+        // 汇总目录/菜单/按钮全链路权限码（含 MenuType = 2 按钮级 PermCode），供前端 v-has-perm 使用
         var permissions = await (
             from userRole in _dbContext.SysUserRoles
             join roleMenu in _dbContext.SysRoleMenus on userRole.RoleId equals roleMenu.RoleId

@@ -403,7 +403,94 @@ Authorization: Bearer <token>
 ### 3.4 删除角色
 
 - **URL**: `DELETE /api/role/{id}`
+- **权限码**: `system:role:delete`（`[HasPermission]` 校验）
 - **成功响应**: `data` 为 `null`
+
+---
+
+### 3.5 获取角色权限分配数据（el-tree 回显）
+
+- **URL**: `GET /api/role/{id}/permissions`
+- **路径参数**: `id` — 角色 ID
+- **成功响应** (`data` 为 `RolePermissionDto`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "allMenus": [
+      {
+        "id": 1,
+        "parentId": null,
+        "title": "系统管理",
+        "path": "/system",
+        "component": "Layout",
+        "permCode": null,
+        "menuType": 0,
+        "icon": "setting",
+        "sort": 1,
+        "children": [
+          {
+            "id": 2,
+            "parentId": 1,
+            "title": "用户管理",
+            "menuType": 1,
+            "children": [
+              {
+                "id": 4,
+                "title": "用户新增",
+                "menuType": 2,
+                "permCode": "system:user:create",
+                "children": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "checkedMenuIds": [1, 2, 3, 4, 5, 6, 7]
+  }
+}
+```
+
+- **字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| allMenus | MenuTreeDto[] | 全量启用菜单树（目录 0 / 菜单 1 / 按钮 2），按 `Sort`、`Id` 升序递归 |
+| checkedMenuIds | int[] | 当前角色已绑定的 MenuId，供 `el-tree.setCheckedKeys()` |
+
+- **业务说明**:
+  - `allMenus` 来自 `SysMenu` 且 `Status = 1`
+  - `checkedMenuIds` 来自 `SysRoleMenu` 中该 `RoleId` 的记录
+
+---
+
+### 3.6 保存角色权限分配
+
+- **URL**: `POST /api/role/{id}/permissions`
+- **路径参数**: `id` — 角色 ID
+- **请求体**: 平铺的 `int` 数组，**不包裹** `dto` 或其它对象壳
+
+```json
+[1, 2, 3, 4, 5, 6, 7]
+```
+
+- 传空数组 `[]` 表示清空该角色全部权限绑定
+- **成功响应**: `data` 为 `null`
+- **业务说明**（事务内执行）:
+  1. 校验角色存在
+  2. 校验 `menuIds` 均为启用中的有效菜单 ID
+  3. 删除 `SysRoleMenu` 中该角色旧关联
+  4. 批量插入新关联
+
+**前端示例**:
+
+```typescript
+// 保存勾选的 keys（含半选父节点时按业务收集 menuIds）
+await api.post(`/api/role/${roleId}/permissions`, checkedKeys);
+```
 
 ---
 
@@ -438,6 +525,20 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 ### 权限判定链路
 
 `SysUserRole -> SysRoleMenu -> SysMenu`，判断当前用户关联的所有角色是否拥有目标权限码（`SysMenu.PermCode`），且对应菜单需为启用状态（`Status = 1`）。
+
+### 与前端 v-has-perm 的关系
+
+- `GET /api/auth/info` 返回的 `permissions` 数组包含 **MenuType = 2（按钮级）** 的 `PermCode`（如 `system:user:create`），与 `[HasPermission]` 校验口径一致。
+- 动态侧边栏菜单使用 `GET /api/auth/menus`，仅返回目录与菜单（`MenuType` 0、1），不含按钮节点。
+
+### 已接入 HasPermission 的接口示例
+
+| 接口 | 权限码 |
+|------|--------|
+| `POST /api/user` | `system:user:create` |
+| `DELETE /api/user/{id}` | `system:user:delete` |
+| `POST /api/role` | `system:role:create` |
+| `DELETE /api/role/{id}` | `system:role:delete` |
 
 ---
 

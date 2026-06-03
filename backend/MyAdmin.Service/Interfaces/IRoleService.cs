@@ -10,4 +10,6 @@ public interface IRoleService
     Task CreateAsync(RoleSaveDto dto);
     Task UpdateAsync(int id, RoleSaveDto dto);
     Task DeleteAsync(int id);
+    Task<RolePermissionDto> GetRolePermissionsAsync(int roleId);
+    Task SaveRolePermissionsAsync(int roleId, List<int> menuIds);
 }

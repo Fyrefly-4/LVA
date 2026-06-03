@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MyAdmin.Core.Common;
 using MyAdmin.Core.Dtos;
+using MyAdmin.Service.Helpers;
 using MyAdmin.Service.Interfaces;
 
 namespace MyAdmin.WebApi.Controllers;
@@ -63,7 +64,7 @@ public class AuthController : ControllerBase
         try
         {
             var flatMenus = await _authService.GetCurrentUserMenusAsync(userId);
-            var tree = BuildMenuTree(flatMenus, null);
+            var tree = MenuTreeBuilder.Build(flatMenus);
             return Ok(ApiResponse<List<MenuTreeDto>>.Success(tree));
         }
         catch (UnauthorizedAccessException ex)
@@ -77,27 +78,5 @@ public class AuthController : ControllerBase
     public ActionResult<ApiResponse<object?>> Logout()
     {
         return Ok(ApiResponse<object?>.Success(null));
-    }
-
-    private static List<MenuTreeDto> BuildMenuTree(IEnumerable<MenuTreeDto> menus, int? parentId)
-    {
-        return menus
-            .Where(menu => menu.ParentId == parentId)
-            .OrderBy(menu => menu.Sort)
-            .ThenBy(menu => menu.Id)
-            .Select(menu => new MenuTreeDto
-            {
-                Id = menu.Id,
-                ParentId = menu.ParentId,
-                Title = menu.Title,
-                Path = menu.Path,
-                Component = menu.Component,
-                PermCode = menu.PermCode,
-                MenuType = menu.MenuType,
-                Icon = menu.Icon,
-                Sort = menu.Sort,
-                Children = BuildMenuTree(menus, menu.Id)
-            })
-            .ToList();
     }
 }

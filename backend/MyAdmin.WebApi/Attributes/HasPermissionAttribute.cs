@@ -42,6 +42,7 @@ public sealed class HasPermissionFilter : IAsyncActionFilter
             return;
         }
 
+        // 匹配 SysMenu.PermCode（含 MenuType = 2 按钮级），与 GetInfo 吐出的 permissions 口径一致
         var hasPermission = await (
             from userRole in _dbContext.SysUserRoles
             join roleMenu in _dbContext.SysRoleMenus on userRole.RoleId equals roleMenu.RoleId

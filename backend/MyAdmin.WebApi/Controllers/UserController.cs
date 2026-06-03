@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MyAdmin.Core.Common;
 using MyAdmin.Core.Dtos;
 using MyAdmin.Service.Interfaces;
+using MyAdmin.WebApi.Attributes;
 
 namespace MyAdmin.WebApi.Controllers;
 
@@ -36,6 +37,7 @@ public class UserController : ControllerBase
     }
 
     [HttpPost]
+    [HasPermission("system:user:create")]
     public async Task<ActionResult<ApiResponse<object?>>> Create([FromBody] UserSaveDto dto)
     {
         try
@@ -64,6 +66,7 @@ public class UserController : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [HasPermission("system:user:delete")]
     public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
     {
         try
