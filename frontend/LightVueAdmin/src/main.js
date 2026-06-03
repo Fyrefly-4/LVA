@@ -6,11 +6,13 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 import App from './App.vue'
 import router from './router'
+import hasPerm from './directives/hasPerm.js'
 
 const app = createApp(App)
 const pinia = createPinia()
 app.use(pinia)
 app.use(router)
+app.directive('has-perm', hasPerm)
 app.use(ElementPlus)
 
 // 全局批量注册el-icon图标组件

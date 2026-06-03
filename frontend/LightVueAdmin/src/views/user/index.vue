@@ -215,7 +215,11 @@
             <el-button type="primary" @click="handleSearch" >搜索</el-button>
             <el-button @click="handleReset">重置</el-button>
             
-            <el-button type="primary" style="margin-left: auto;" @click="openAddDialog">添加用户</el-button>
+            <el-button type="primary" style="margin-left: auto;" 
+                @click="openAddDialog" v-has-perm="'system:user:create'"
+            >
+                添加用户
+            </el-button>
         </div>
 
         <el-table :data="tableData" style="width: 100%; border">
@@ -236,11 +240,15 @@
 
             <el-table-column label="操作" width="180" fixed="right">
                 <template #default="scope">
-                    <el-button type="primary" size="small" @click="openEditDialog(scope.row)">
+                    <el-button type="primary" size="small" @click="openEditDialog(scope.row)"
+                        v-has-perm="'system:user:edit'"
+                    >
                         编辑
                     </el-button>
 
-                    <el-button type="danger" size="small" @click="handleDelete(scope.row)">
+                    <el-button type="danger" size="small" @click="handleDelete(scope.row)"
+                        v-has-perm="'system:user:delete'"
+                    >
                         删除
                     </el-button>
                 </template>
@@ -269,7 +277,7 @@
                     <el-input v-model="formModel.email" placeholder="请输入邮箱" />
                 </el-form-item>
 
-                <el-form-item label="分配角色">
+                <el-form-item label="分配角色" v-has-perm="'system:user:assignRole'">
                     <el-checkbox-group v-model="formModel.roleIds">
                         <el-checkbox v-for="role in allRoles" :key="role.id" :value="role.id">
                             {{ role.roleName }}

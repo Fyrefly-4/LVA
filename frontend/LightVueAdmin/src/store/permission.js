@@ -108,9 +108,26 @@ const usePermissionStore = defineStore('permission', {
             this.permissions = []
             this.menuTree = []
             this.dynamicRoutes = []
+        },
+
+        //4. 核心鉴权方法：检查当前用户是否拥有某个或某些权限
+        hasPermission(value) {
+            // 放行超级管理员或拥有通配符的用户
+            if (this.roles.includes('admin') || this.permissions.includes('*.*.*')) {
+                return true
+            }
+
+            if(!value) return true
+
+            //如果传进来数组, 多选一
+            if (Array.isArray(value)) {
+                return value.some(perm => this.permissions.includes(perm))
+            }
+            //如果传进单个字符串
+            return this.permissions.includes(value)
         }
     }
-
+    
 })
 
 export default usePermissionStore

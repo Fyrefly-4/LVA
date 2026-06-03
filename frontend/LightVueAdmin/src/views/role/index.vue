@@ -248,7 +248,11 @@
             <template #header>
                 <div class="card-header">
                     <span style="font-weight: bold; font-size: 16px;">角色管理模块</span>
-                    <el-button type="primary" style="margin-left: auto;" @click="openAddDialog">新增角色</el-button>
+                    <el-button type="primary" style="margin-left: auto;" 
+                        @click="openAddDialog" v-has-perm="'system:role:create'"
+                    >
+                        新增角色
+                    </el-button>
                 </div>
             </template>
 
@@ -266,15 +270,24 @@
 
                 <el-table-column label="操作" width="230" align="center" fixed="right" >
                     <template #default="scope">
-                        <el-button type="primary" size="small" @click="openEditDialog(scope.row)">
+                        <el-button type="primary" size="small" @click="openEditDialog(scope.row)" 
+                            :disabled="scope.row.roleCode === 'admin' || scope.row.id === 1"
+                            v-has-perm="'system:role:edit'"
+                        >
                             编辑
                         </el-button>
 
-                        <el-button type="warning" size="small" @click="openPermDialog(scope.row)">
+                        <el-button type="warning" size="small" @click="openPermDialog(scope.row)"
+                            :disabled="scope.row.roleCode === 'admin' || scope.row.id === 1"
+                            v-has-perm="'system:role:assignPerm'"
+                        >
                             分配权限
                         </el-button>
 
-                        <el-button type="danger" size="small" @click="handleDelete(scope.row)">
+                        <el-button type="danger" size="small" @click="handleDelete(scope.row)"
+                            :disabled="scope.row.roleCode === 'admin' || scope.row.id === 1"
+                            v-has-perm="'system:role:delete'"
+                        >
                             删除
                         </el-button>
                     </template>
