@@ -11,4 +11,5 @@ public class SysUser
     public DateTime CreateTime { get; set; }
 
     public ICollection<SysUserRole> UserRoles { get; set; } = new List<SysUserRole>();
+    public ICollection<SysBorrowLog> BorrowLogs { get; set; } = new List<SysBorrowLog>();
 }

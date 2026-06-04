@@ -565,7 +565,7 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 管理员 | `admin` | 超级管理员 |
 | 普通用户 | `user` | 普通用户 |
 
-### 菜单权限树（共 9 条）
+### 菜单权限树（共 16 条）
 
 | 层级 | Title | Path | Component | PermCode | MenuType | ParentId |
 |------|-------|------|-----------|----------|----------|----------|
@@ -578,13 +578,20 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 按钮 | 角色新增 | - | - | `system:role:create` | 2 | 角色管理.Id |
 | 按钮 | 角色删除 | - | - | `system:role:delete` | 2 | 角色管理.Id |
 | 按钮 | 分配权限 | - | - | `system:role:assignPerm` | 2 | 角色管理.Id |
+| 目录 | 业务中台 | `/business` | `Layout` | - | 0 | `null`（根节点） |
+| 菜单 | 知识库流转 | `knowledge` | `views/knowledge/index.vue` | `system:knowledge:bookList` | 1 | 业务中台.Id |
+| 按钮 | 批量指派 | - | - | `system:knowledge:borrow` | 2 | 知识库流转.Id |
+| 按钮 | 归还入库 | - | - | `system:knowledge:return` | 2 | 知识库流转.Id |
+| 按钮 | 新增文献 | - | - | `system:knowledge:create` | 2 | 知识库流转.Id |
+| 按钮 | 编辑文献 | - | - | `system:knowledge:edit` | 2 | 知识库流转.Id |
+| 按钮 | 删除文献 | - | - | `system:knowledge:delete` | 2 | 知识库流转.Id |
 
 > 根节点 `ParentId = null`（非 `0`），因为 `SysMenu` 表存在自关联外键约束，`ParentId = 0` 会触发 FK 冲突。
 
 ### 关联绑定
 
 - **用户角色**：`admin` 用户 ↔ `admin` 角色
-- **角色菜单**：`admin` 角色 ↔ 上述全部 9 条菜单/按钮（管理员拥有全栈权限）
+- **角色菜单**：`admin` 角色 ↔ 上述全部 16 条菜单/按钮（管理员拥有全栈权限）
 
 ---
 
@@ -617,3 +624,199 @@ api.interceptors.response.use((response) => {
 
 export default api;
 ```
+
+---
+
+## 7. 知识库流转系统 (Knowledge)
+
+> 以下接口均需认证；所有接口已接入 `[HasPermission]` 细粒度鉴权（流转审计日志除外，仅需认证）。
+
+### 7.1 条件分页获取文献资产列表
+
+- **URL**: `GET /api/knowledge/book/list`
+- **权限码**: `system:knowledge:bookList`
+- **Query 参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| pageIndex | int | 否 | 页码，默认 `1` |
+| pageSize | int | 否 | 每页条数，默认 `10` |
+| keyword | string | 否 | 按 `title` / `isbn` 模糊搜索 |
+| category | string | 否 | 文献分类精确筛选 |
+
+成功响应 `data` 为扁平分页壳：
+
+```json
+{
+  "total": 12,
+  "items": [
+    {
+      "id": 1,
+      "title": "ASP.NET Core 架构实践",
+      "isbn": "KB-2026-001",
+      "category": "技术文献",
+      "price": 99.00,
+      "stock": 5,
+      "status": 1,
+      "createTime": "2026-06-04 10:00:00"
+    }
+  ]
+}
+```
+
+### 7.2 批量流转指派借阅
+
+- **URL**: `POST /api/knowledge/borrow`
+- **权限码**: `system:knowledge:borrow`
+- **请求体**: 扁平 JSON，不包裹 `dto` / `data`
+
+```json
+{
+  "userId": 3,
+  "bookIds": [1, 2, 5],
+  "borrowDays": 14
+}
+```
+
+业务逻辑在数据库事务中执行：校验用户正常、逐本校验文献存在且 `status = 1`、`stock > 0`，扣减库存并批量写入 `SysBorrowLog`。任一文献不满足条件时整批回滚。
+
+### 7.3 办理资产归还入库
+
+- **URL**: `POST /api/knowledge/return/{logId}`
+- **权限码**: `system:knowledge:return`
+
+归还成功后，将 `ActualReturnTime` 设置为当前时间、`LogStatus` 改为 `1`，并将关联 `SysBook.Stock` 加 `1`。已归还记录不可重复入库。
+
+### 7.4 获取流转审计历史日志
+
+- **URL**: `GET /api/knowledge/log/list`
+- **Query 参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| pageIndex | int | 否 | 页码，默认 `1` |
+| pageSize | int | 否 | 每页条数，默认 `10` |
+| logStatus | byte | 否 | `0` 流转中，`1` 已归还，`2` 逾期未还 |
+
+查询前会将已超过 `ReturnTime` 且仍流转中的记录批量标记为 `2`，以保证逾期筛选结果准确。
+
+### 7.5 新增文献
+
+- **URL**: `POST /api/knowledge/book`
+- **权限码**: `system:knowledge:create`
+- **请求体**: 扁平 JSON，不包裹 `dto` / `data`
+
+```json
+{
+  "title": "ASP.NET Core 架构实践",
+  "isbn": "KB-2026-001",
+  "category": "技术文献",
+  "price": 99.00,
+  "stock": 5,
+  "status": 1
+}
+```
+
+`KnowledgeBookSaveRequest` 字段说明：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| title | string | 是 | 文献名称，最大 100 字符 |
+| isbn | string | 是 | ISBN 编号，最大 30 字符，全局唯一 |
+| category | string? | 否 | 文献分类，最大 50 字符 |
+| price | decimal | 否 | 价格，精度 decimal(10,2) |
+| stock | int | 否 | 库存数量，默认 0 |
+| status | byte | 否 | 状态：`1` 正常流转，`0` 盘点维护中，默认 `1` |
+
+- **成功响应** (`code: 200`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+- **失败响应** (`code: 500`):
+
+```json
+{
+  "code": 500,
+  "message": "ISBN 已存在",
+  "data": null
+}
+```
+
+### 7.6 修改文献
+
+- **URL**: `PUT /api/knowledge/book/{id}`
+- **权限码**: `system:knowledge:edit`
+- **请求体**: 与新增文献相同的 `KnowledgeBookSaveRequest` 结构
+
+```json
+{
+  "title": "ASP.NET Core 架构实践（第2版）",
+  "isbn": "KB-2026-001",
+  "category": "技术文献",
+  "price": 128.00,
+  "stock": 3,
+  "status": 1
+}
+```
+
+- **成功响应** (`code: 200`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+- **失败响应** (`code: 500`):
+
+```json
+{
+  "code": 500,
+  "message": "文献不存在",
+  "data": null
+}
+```
+
+### 7.7 删除文献
+
+- **URL**: `DELETE /api/knowledge/book/{id}`
+- **权限码**: `system:knowledge:delete`
+
+- **成功响应** (`code: 200`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+- **失败响应** (`code: 500`):
+
+```json
+{
+  "code": 500,
+  "message": "文献不存在",
+  "data": null
+}
+```
+
+### 7.8 权限码汇总
+
+| 接口 | 权限码 |
+|------|--------|
+| `POST /api/knowledge/book` | `system:knowledge:create` |
+| `PUT /api/knowledge/book/{id}` | `system:knowledge:edit` |
+| `DELETE /api/knowledge/book/{id}` | `system:knowledge:delete` |
+| `GET /api/knowledge/book/list` | `system:knowledge:bookList` |
+| `POST /api/knowledge/borrow` | `system:knowledge:borrow` |
+| `POST /api/knowledge/return/{logId}` | `system:knowledge:return` |

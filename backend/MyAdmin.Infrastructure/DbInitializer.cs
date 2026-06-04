@@ -186,7 +186,113 @@ public static class DbInitializer
         context.SysMenus.AddRange(assignRoleBtn, assignPermBtn);
         await context.SaveChangesAsync(); // 获取两个按钮的 Id
 
-        // 收集全部 9 个菜单/按钮的 Id，用于后续角色绑定
+        // A8. 业务中台目录与知识库流转菜单/按钮权限
+        var businessMenu = new SysMenu
+        {
+            Title = "业务中台",
+            Path = "/business",
+            Component = "Layout",
+            ParentId = null,
+            MenuType = 0,
+            Icon = "Management",
+            Sort = 2,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+        context.SysMenus.Add(businessMenu);
+        await context.SaveChangesAsync();
+
+        var knowledgeMenu = new SysMenu
+        {
+            Title = "知识库流转",
+            Path = "knowledge",
+            Component = "views/knowledge/index.vue",
+            ParentId = businessMenu.Id,
+            MenuType = 1,
+            Icon = "Reading",
+            PermCode = "system:knowledge:bookList",
+            Sort = 1,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+        context.SysMenus.Add(knowledgeMenu);
+        await context.SaveChangesAsync();
+
+        var knowledgeBorrowBtn = new SysMenu
+        {
+            Title = "批量指派",
+            Path = "",
+            Component = "",
+            ParentId = knowledgeMenu.Id,
+            MenuType = 2,
+            Icon = "",
+            PermCode = "system:knowledge:borrow",
+            Sort = 1,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+
+        var knowledgeReturnBtn = new SysMenu
+        {
+            Title = "归还入库",
+            Path = "",
+            Component = "",
+            ParentId = knowledgeMenu.Id,
+            MenuType = 2,
+            Icon = "",
+            PermCode = "system:knowledge:return",
+            Sort = 2,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+        context.SysMenus.AddRange(knowledgeBorrowBtn, knowledgeReturnBtn);
+        await context.SaveChangesAsync();
+
+        var knowledgeCreateBtn = new SysMenu
+        {
+            Title = "新增文献",
+            Path = "",
+            Component = "",
+            ParentId = knowledgeMenu.Id,
+            MenuType = 2,
+            Icon = "",
+            PermCode = "system:knowledge:create",
+            Sort = 3,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+
+        var knowledgeEditBtn = new SysMenu
+        {
+            Title = "编辑文献",
+            Path = "",
+            Component = "",
+            ParentId = knowledgeMenu.Id,
+            MenuType = 2,
+            Icon = "",
+            PermCode = "system:knowledge:edit",
+            Sort = 4,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+
+        var knowledgeDeleteBtn = new SysMenu
+        {
+            Title = "删除文献",
+            Path = "",
+            Component = "",
+            ParentId = knowledgeMenu.Id,
+            MenuType = 2,
+            Icon = "",
+            PermCode = "system:knowledge:delete",
+            Sort = 5,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+        context.SysMenus.AddRange(knowledgeCreateBtn, knowledgeEditBtn, knowledgeDeleteBtn);
+        await context.SaveChangesAsync();
+
+        // 收集全部 16 个菜单/按钮的 Id，用于后续角色绑定
         var allMenuIds = new List<int>
         {
             systemMenu.Id,
@@ -197,7 +303,14 @@ public static class DbInitializer
             assignRoleBtn.Id,
             roleCreateBtn.Id,
             roleDeleteBtn.Id,
-            assignPermBtn.Id
+            assignPermBtn.Id,
+            businessMenu.Id,
+            knowledgeMenu.Id,
+            knowledgeBorrowBtn.Id,
+            knowledgeReturnBtn.Id,
+            knowledgeCreateBtn.Id,
+            knowledgeEditBtn.Id,
+            knowledgeDeleteBtn.Id
         };
 
         // ==================== B. 初始角色 (SysRole) ====================
@@ -242,7 +355,7 @@ public static class DbInitializer
         });
         await context.SaveChangesAsync();
 
-        // D2. 角色菜单关联 (SysRoleMenu) - 将 admin 角色与全部 9 个菜单/按钮批量绑定
+        // D2. 角色菜单关联 (SysRoleMenu) - 将 admin 角色与全部 13 个菜单/按钮批量绑定
         // 确保管理员拥有全栈动态菜单渲染权与细粒度接口操作权（[HasPermission] 校验）
         var adminRoleMenus = allMenuIds.Select(menuId => new SysRoleMenu
         {

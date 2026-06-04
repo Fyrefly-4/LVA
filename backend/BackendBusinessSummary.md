@@ -198,7 +198,7 @@
 - 物理删除旧库并重新建库（`EnsureDeletedAsync()` + `EnsureCreatedAsync()`，首次注入成功后已注释）
 - 注入完整 RBAC 种子数据：
 
-### 菜单权限树（9 条，利用 EF 上下文生命周期避免硬编码 Id）
+### 菜单权限树（16 条，利用 EF 上下文生命周期避免硬编码 Id）
 
 | 层级 | Title | PermCode | MenuType | 父级 |
 |------|-------|----------|----------|------|
@@ -211,6 +211,13 @@
 | 按钮 | 角色新增 | `system:role:create` | 2 | 角色管理 |
 | 按钮 | 角色删除 | `system:role:delete` | 2 | 角色管理 |
 | 按钮 | 分配权限 | `system:role:assignPerm` | 2 | 角色管理 |
+| 目录 | 业务中台 | - | 0 | `null`（根节点） |
+| 菜单 | 知识库流转 | `system:knowledge:bookList` | 1 | 业务中台 |
+| 按钮 | 批量指派 | `system:knowledge:borrow` | 2 | 知识库流转 |
+| 按钮 | 归还入库 | `system:knowledge:return` | 2 | 知识库流转 |
+| 按钮 | 新增文献 | `system:knowledge:create` | 2 | 知识库流转 |
+| 按钮 | 编辑文献 | `system:knowledge:edit` | 2 | 知识库流转 |
+| 按钮 | 删除文献 | `system:knowledge:delete` | 2 | 知识库流转 |
 
 > 根节点 `ParentId = null`，因为 `SysMenu` 表存在自关联外键约束（`FK_SysMenu_SysMenu_ParentId`），`ParentId = 0` 会触发 FK 冲突。
 
@@ -226,7 +233,7 @@
 ### 关联绑定
 
 - **用户角色**：admin 用户 ↔ admin 角色
-- **角色菜单**：admin 角色 ↔ 全部 9 条菜单/按钮（管理员拥有全栈动态菜单渲染权与细粒度接口操作权）
+- **角色菜单**：admin 角色 ↔ 全部 16 条菜单/按钮（管理员拥有全栈动态菜单渲染权与细粒度接口操作权）
 
 ## 6. 重要结论
 
@@ -399,3 +406,97 @@
 - **Swagger 页面无法访问**：检查是否运行在 `Development` 环境，Swagger 仅在开发环境下启用（`app.Environment.IsDevelopment()`）。
 - **端口不一致**：以 `launchSettings.json` 中的 `applicationUrl` 为准，默认为 `http://localhost:5014`。
 - **请求返回 403**：当前用户缺少接口所需的权限码，检查 `SysRoleMenu` 和 `SysMenu` 表中是否正确配置了对应的权限关联。
+
+---
+
+## 9. 知识库流转系统增量说明
+
+本次在现有 RBAC 底座上新增知识库文献资产和借阅流转审计能力，继续遵循四层架构：实体放在 `MyAdmin.Core`，EF 配置放在 `MyAdmin.Infrastructure`，业务事务逻辑放在 `MyAdmin.Service`，接口和 `[HasPermission]` 挂载放在 `MyAdmin.WebApi`。
+
+### 9.1 新增数据表
+
+- `SysBook`
+  - `Id` int PK 自增
+  - `Title` nvarchar(100) 必填
+  - `Isbn` varchar(30) 必填且唯一
+  - `Category` nvarchar(50)
+  - `Price` decimal(10,2)
+  - `Stock` int 默认 `0`
+  - `Status` tinyint 默认 `1`，`1` 正常流转，`0` 盘点维护中
+  - `CreateTime` datetime 默认 `GETDATE()`
+
+- `SysBorrowLog`
+  - `Id` int PK 自增
+  - `BookId` 外键关联 `SysBook.Id`，级联删除
+  - `BookTitle` nvarchar(100) 文献标题快照
+  - `UserId` 外键关联 `SysUser.Id`，级联删除
+  - `Username` varchar(50) 借阅人账号快照
+  - `Nickname` nvarchar(50) 借阅人姓名快照
+  - `BorrowTime` datetime 默认 `GETDATE()`
+  - `ReturnTime` datetime 应还时间
+  - `ActualReturnTime` datetime 可空
+  - `LogStatus` tinyint 默认 `0`，`0` 流转中，`1` 已归还，`2` 逾期未还
+
+### 9.2 服务与接口
+
+`KnowledgeService` 提供 7 个方法：
+
+- `GetBookListAsync(pageIndex, pageSize, keyword, category)`：文献资产分页查询，使用 `AsNoTracking` 和投影返回扁平分页结构。
+- `CreateBookAsync(KnowledgeBookSaveRequest request)`：新增文献，校验 ISBN 唯一性后写入 `SysBook`。
+- `UpdateBookAsync(int id, KnowledgeBookSaveRequest request)`：修改文献，校验文献存在及 ISBN 唯一性（排除自身）后更新。
+- `DeleteBookAsync(int id)`：删除文献，校验文献存在后物理删除。
+- `BorrowAsync(KnowledgeBorrowRequest request)`：批量流转指派，使用 `Serializable` 数据库事务；校验借阅用户、逐本文献校验库存和状态，扣减库存并写入借阅日志，任一步失败即回滚。
+- `ReturnAsync(logId)`：归还入库，事务内更新日志归还状态并回滚文献库存。
+- `GetLogListAsync(pageIndex, pageSize, logStatus)`：流转审计分页查询，查询前将超期未还记录标记为 `LogStatus = 2`。
+
+`KnowledgeController` 暴露接口：
+
+| 接口 | 说明 | 权限码 |
+|------|------|--------|
+| `POST /api/knowledge/book` | 新增文献 | `system:knowledge:create` |
+| `PUT /api/knowledge/book/{id}` | 修改文献 | `system:knowledge:edit` |
+| `DELETE /api/knowledge/book/{id}` | 删除文献 | `system:knowledge:delete` |
+| `GET /api/knowledge/book/list` | 条件分页获取文献资产列表 | `system:knowledge:bookList` |
+| `POST /api/knowledge/borrow` | 批量流转指派借阅 | `system:knowledge:borrow` |
+| `POST /api/knowledge/return/{logId}` | 办理资产归还入库 | `system:knowledge:return` |
+| `GET /api/knowledge/log/list` | 获取流转审计历史日志 | 仅需认证 |
+
+### 9.3 种子权限扩展
+
+`DbInitializer.SeedAsync()` 新增业务中台权限树：
+
+| 层级 | Title | PermCode | MenuType | 父级 |
+|------|-------|----------|----------|------|
+| 目录 | 业务中台 | - | 0 | `null` |
+| 菜单 | 知识库流转 | `system:knowledge:bookList` | 1 | 业务中台 |
+| 按钮 | 批量指派 | `system:knowledge:borrow` | 2 | 知识库流转 |
+| 按钮 | 归还入库 | `system:knowledge:return` | 2 | 知识库流转 |
+| 按钮 | 新增文献 | `system:knowledge:create` | 2 | 知识库流转 |
+| 按钮 | 编辑文献 | `system:knowledge:edit` | 2 | 知识库流转 |
+| 按钮 | 删除文献 | `system:knowledge:delete` | 2 | 知识库流转 |
+
+上述 7 条资源已加入 admin 角色的 `SysRoleMenu` 初始绑定，管理员初始化后自动拥有知识库流转模块菜单访问权和按钮级接口权限。
+
+### 9.4 DTO 字段定义
+
+`KnowledgeBookSaveRequest`（新增/修改文献共用）：
+
+- `Title` string 必填，文献名称，最大 100 字符
+- `Isbn` string 必填，ISBN 编号，最大 30 字符，全局唯一
+- `Category` string? 可空，文献分类，最大 50 字符
+- `Price` decimal，价格，精度 decimal(10,2)
+- `Stock` int，库存数量，默认 0
+- `Status` byte，状态：`1` 正常流转，`0` 盘点维护中，默认 `1`
+
+`KnowledgeBorrowLogDto`（流转审计日志返回）：
+
+- `Id` int
+- `BookId` int
+- `BookTitle` string
+- `UserId` int
+- `Username` string
+- `Nickname` string
+- `BorrowTime` string
+- `ReturnTime` string
+- `ActualReturnTime` string? 可空
+- `LogStatus` byte，`0` 流转中，`1` 已归还，`2` 逾期未还

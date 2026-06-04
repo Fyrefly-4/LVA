@@ -14,6 +14,8 @@ public class MyAdminDbContext : DbContext
     public DbSet<SysUserRole> SysUserRoles => Set<SysUserRole>();
     public DbSet<SysMenu> SysMenus => Set<SysMenu>();
     public DbSet<SysRoleMenu> SysRoleMenus => Set<SysRoleMenu>();
+    public DbSet<SysBook> SysBooks => Set<SysBook>();
+    public DbSet<SysBorrowLog> SysBorrowLogs => Set<SysBorrowLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -98,6 +100,46 @@ public class MyAdminDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             entity.HasIndex(e => e.MenuId);
+        });
+
+        modelBuilder.Entity<SysBook>(entity =>
+        {
+            entity.ToTable("SysBook");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.Title).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Isbn).HasMaxLength(30).IsUnicode(false).IsRequired();
+            entity.HasIndex(e => e.Isbn).IsUnique();
+            entity.Property(e => e.Category).HasMaxLength(50);
+            entity.Property(e => e.Price).HasColumnType("decimal(10,2)");
+            entity.Property(e => e.Stock).HasDefaultValue(0);
+            entity.Property(e => e.Status).HasDefaultValue((byte)1);
+            entity.Property(e => e.CreateTime).HasDefaultValueSql("GETDATE()");
+        });
+
+        modelBuilder.Entity<SysBorrowLog>(entity =>
+        {
+            entity.ToTable("SysBorrowLog");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Id).ValueGeneratedOnAdd();
+            entity.Property(e => e.BookTitle).HasMaxLength(100).IsRequired();
+            entity.Property(e => e.Username).HasMaxLength(50).IsUnicode(false).IsRequired();
+            entity.Property(e => e.Nickname).HasMaxLength(50).IsRequired();
+            entity.Property(e => e.BorrowTime).HasDefaultValueSql("GETDATE()");
+            entity.Property(e => e.LogStatus).HasDefaultValue((byte)0);
+            entity.HasIndex(e => e.BookId);
+            entity.HasIndex(e => e.UserId);
+            entity.HasIndex(e => e.LogStatus);
+
+            entity.HasOne(e => e.Book)
+                .WithMany(e => e.BorrowLogs)
+                .HasForeignKey(e => e.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.User)
+                .WithMany(e => e.BorrowLogs)
+                .HasForeignKey(e => e.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

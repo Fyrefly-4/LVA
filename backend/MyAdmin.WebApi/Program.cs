@@ -8,6 +8,8 @@ using MyAdmin.Infrastructure;
 using MyAdmin.Service.Implementations;
 using MyAdmin.Service.Interfaces;
 
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection(JwtSettings.SectionName));
@@ -18,6 +20,7 @@ builder.Services.AddDbContext<MyAdminDbContext>(options =>
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IRoleService, RoleService>();
+builder.Services.AddScoped<IKnowledgeService, KnowledgeService>();
 
 var jwtSettings = builder.Configuration.GetSection(JwtSettings.SectionName).Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
