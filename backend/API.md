@@ -565,7 +565,7 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 管理员 | `admin` | 超级管理员 |
 | 普通用户 | `user` | 普通用户 |
 
-### 菜单权限树（共 16 条）
+### 菜单权限树（共 17 条）
 
 | 层级 | Title | Path | Component | PermCode | MenuType | ParentId |
 |------|-------|------|-----------|----------|----------|----------|
@@ -579,19 +579,20 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 按钮 | 角色删除 | - | - | `system:role:delete` | 2 | 角色管理.Id |
 | 按钮 | 分配权限 | - | - | `system:role:assignPerm` | 2 | 角色管理.Id |
 | 目录 | 业务中台 | `/business` | `Layout` | - | 0 | `null`（根节点） |
-| 菜单 | 知识库流转 | `knowledge` | `views/knowledge/index.vue` | `system:knowledge:bookList` | 1 | 业务中台.Id |
-| 按钮 | 批量指派 | - | - | `system:knowledge:borrow` | 2 | 知识库流转.Id |
-| 按钮 | 归还入库 | - | - | `system:knowledge:return` | 2 | 知识库流转.Id |
-| 按钮 | 新增文献 | - | - | `system:knowledge:create` | 2 | 知识库流转.Id |
-| 按钮 | 编辑文献 | - | - | `system:knowledge:edit` | 2 | 知识库流转.Id |
-| 按钮 | 删除文献 | - | - | `system:knowledge:delete` | 2 | 知识库流转.Id |
+| 菜单 | 文献管理 | `knowledge` | `views/knowledge/book.vue` | `system:knowledge:bookList` | 1 | 业务中台.Id |
+| 按钮 | 批量指派 | - | - | `system:knowledge:borrow` | 2 | 文献管理.Id |
+| 按钮 | 归还入库 | - | - | `system:knowledge:return` | 2 | 文献管理.Id |
+| 按钮 | 新增文献 | - | - | `system:knowledge:create` | 2 | 文献管理.Id |
+| 按钮 | 编辑文献 | - | - | `system:knowledge:edit` | 2 | 文献管理.Id |
+| 按钮 | 删除文献 | - | - | `system:knowledge:delete` | 2 | 文献管理.Id |
+| 菜单 | 借阅日志 | `borrow-log` | `views/knowledge/borrow-log.vue` | `system:borrow:list` | 1 | 业务中台.Id |
 
 > 根节点 `ParentId = null`（非 `0`），因为 `SysMenu` 表存在自关联外键约束，`ParentId = 0` 会触发 FK 冲突。
 
 ### 关联绑定
 
 - **用户角色**：`admin` 用户 ↔ `admin` 角色
-- **角色菜单**：`admin` 角色 ↔ 上述全部 16 条菜单/按钮（管理员拥有全栈权限）
+- **角色菜单**：`admin` 角色 ↔ 上述全部 17 条菜单/按钮（管理员拥有全栈权限）
 
 ---
 
@@ -627,7 +628,7 @@ export default api;
 
 ---
 
-## 7. 知识库流转系统 (Knowledge)
+## 7. 文献管理系统 (Knowledge)
 
 > 以下接口均需认证；所有接口已接入 `[HasPermission]` 细粒度鉴权（流转审计日志除外，仅需认证）。
 

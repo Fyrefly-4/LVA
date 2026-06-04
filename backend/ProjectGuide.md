@@ -155,7 +155,7 @@ backend/
 
 **权限码命名规范**：`system:{module}:{action}`，如 `system:user:create`、`system:knowledge:bookList`
 
-**当前全部 16 条权限树**：
+**当前全部 17 条权限树**：
 
 | 层级 | Title | PermCode | MenuType | 父级 |
 |------|-------|----------|----------|------|
@@ -169,12 +169,13 @@ backend/
 | 按钮 | 角色删除 | `system:role:delete` | 2 | 角色管理 |
 | 按钮 | 分配权限 | `system:role:assignPerm` | 2 | 角色管理 |
 | 目录 | 业务中台 | - | 0 | `null` |
-| 菜单 | 知识库流转 | `system:knowledge:bookList` | 1 | 业务中台 |
-| 按钮 | 批量指派 | `system:knowledge:borrow` | 2 | 知识库流转 |
-| 按钮 | 归还入库 | `system:knowledge:return` | 2 | 知识库流转 |
-| 按钮 | 新增文献 | `system:knowledge:create` | 2 | 知识库流转 |
-| 按钮 | 编辑文献 | `system:knowledge:edit` | 2 | 知识库流转 |
-| 按钮 | 删除文献 | `system:knowledge:delete` | 2 | 知识库流转 |
+| 菜单 | 文献管理 | `system:knowledge:bookList` | 1 | 业务中台 |
+| 按钮 | 批量指派 | `system:knowledge:borrow` | 2 | 文献管理 |
+| 按钮 | 归还入库 | `system:knowledge:return` | 2 | 文献管理 |
+| 按钮 | 新增文献 | `system:knowledge:create` | 2 | 文献管理 |
+| 按钮 | 编辑文献 | `system:knowledge:edit` | 2 | 文献管理 |
+| 按钮 | 删除文献 | `system:knowledge:delete` | 2 | 文献管理 |
+| 菜单 | 借阅日志 | `system:borrow:list` | 1 | 业务中台 |
 
 > **注意**：`ParentId = null`（非 `0`），因为 `SysMenu` 表存在自关联外键约束 `FK_SysMenu_SysMenu_ParentId`。
 
@@ -312,8 +313,8 @@ SysUser ──< SysUserRole >── SysRole ──< SysRoleMenu >── SysMenu
 
 - **用户**：`admin` / `password123`（BCrypt 哈希），昵称 `超级管理员`
 - **角色**：`admin`（超级管理员）、`user`（普通用户）
-- **菜单**：16 条（系统管理 9 条 + 业务中台 7 条）
-- **绑定**：admin 用户 → admin 角色 → 全部 16 条菜单/按钮
+- **菜单**：17 条（系统管理 9 条 + 业务中台 8 条）
+- **绑定**：admin 用户 → admin 角色 → 全部 17 条菜单/按钮
 
 种子数据入口：[`MyAdmin.Infrastructure/DbInitializer.cs`](file:///c:/Users/RISEY/Desktop/Codes/VS Code/Front-End/LVA/backend/MyAdmin.Infrastructure/DbInitializer.cs) 的 `SeedAsync` 方法。
 

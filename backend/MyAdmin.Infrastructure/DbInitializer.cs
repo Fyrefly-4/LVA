@@ -28,10 +28,11 @@ public static class DbInitializer
         // ==================== 【危险操作区结束】 ====================
 
         // ==================== 数据存在性检查 ====================
-        // 如果数据库中已有角色数据，说明种子数据已注入过，直接跳过避免重复插入
+        // 如果数据库中已有角色数据，说明种子数据已注入过，执行增量更新逻辑
         if (await context.SysRoles.AnyAsync())
         {
-            Console.WriteLine("ℹ️  Database already seeded. Skipping seed data injection.");
+            Console.WriteLine("ℹ️  Database already seeded. Running incremental update...");
+            await ApplyIncrementalUpdatesAsync(context);
             return;
         }
 
@@ -186,7 +187,7 @@ public static class DbInitializer
         context.SysMenus.AddRange(assignRoleBtn, assignPermBtn);
         await context.SaveChangesAsync(); // 获取两个按钮的 Id
 
-        // A8. 业务中台目录与知识库流转菜单/按钮权限
+        // A8. 业务中台目录与文献管理/借阅日志菜单及按钮权限
         var businessMenu = new SysMenu
         {
             Title = "业务中台",
@@ -204,9 +205,9 @@ public static class DbInitializer
 
         var knowledgeMenu = new SysMenu
         {
-            Title = "知识库流转",
+            Title = "文献管理",
             Path = "knowledge",
-            Component = "views/knowledge/index.vue",
+            Component = "views/knowledge/book.vue",
             ParentId = businessMenu.Id,
             MenuType = 1,
             Icon = "Reading",
@@ -292,7 +293,24 @@ public static class DbInitializer
         context.SysMenus.AddRange(knowledgeCreateBtn, knowledgeEditBtn, knowledgeDeleteBtn);
         await context.SaveChangesAsync();
 
-        // 收集全部 16 个菜单/按钮的 Id，用于后续角色绑定
+        // A9. 菜单级（MenuType = 1）- 借阅日志（父级为业务中台）
+        var borrowLogMenu = new SysMenu
+        {
+            Title = "借阅日志",
+            Path = "borrow-log",
+            Component = "views/knowledge/borrow-log.vue",
+            ParentId = businessMenu.Id,
+            MenuType = 1,
+            Icon = "Notebook",
+            PermCode = "system:borrow:list",
+            Sort = 2,
+            Status = 1,
+            CreateTime = DateTime.Now
+        };
+        context.SysMenus.Add(borrowLogMenu);
+        await context.SaveChangesAsync();
+
+        // 收集全部 17 个菜单/按钮的 Id，用于后续角色绑定
         var allMenuIds = new List<int>
         {
             systemMenu.Id,
@@ -310,7 +328,8 @@ public static class DbInitializer
             knowledgeReturnBtn.Id,
             knowledgeCreateBtn.Id,
             knowledgeEditBtn.Id,
-            knowledgeDeleteBtn.Id
+            knowledgeDeleteBtn.Id,
+            borrowLogMenu.Id
         };
 
         // ==================== B. 初始角色 (SysRole) ====================
@@ -372,5 +391,97 @@ public static class DbInitializer
         Console.WriteLine($"   - User Role: {userRole.RoleCode} (Id={userRole.Id})");
         Console.WriteLine($"   - Menus: {allMenuIds.Count} items injected");
         Console.WriteLine($"   - Role-Menu Bindings: {adminRoleMenus.Count} records created");
+    }
+
+    /// <summary>
+    /// 增量更新逻辑：安全地追加或修改菜单/权限数据，不覆盖已有记录。
+    /// 
+    /// 使用场景：
+    /// - 前端重构后菜单路径变更（如 Component 路径调整）
+    /// - 新增菜单/按钮节点
+    /// - 自动将新菜单绑定到 admin 角色
+    /// 
+    /// 幂等性：多次执行不会产生重复数据，基于 PermCode 唯一性判断。
+    /// </summary>
+    private static async Task ApplyIncrementalUpdatesAsync(MyAdminDbContext context)
+    {
+        var updated = false;
+
+        // 1. 更新文献管理菜单的 Title 和 Component（如果还是旧值）
+        var knowledgeMenu = await context.SysMenus
+            .FirstOrDefaultAsync(m => m.PermCode == "system:knowledge:bookList");
+        if (knowledgeMenu != null)
+        {
+            if (knowledgeMenu.Title == "知识库流转" || knowledgeMenu.Component == "views/knowledge/index.vue")
+            {
+                knowledgeMenu.Title = "文献管理";
+                knowledgeMenu.Component = "views/knowledge/book.vue";
+                updated = true;
+                Console.WriteLine("   - Updated: 文献管理 menu (Title/Component)");
+            }
+        }
+
+        // 2. 检查并插入借阅日志菜单节点（基于 PermCode 唯一性）
+        var borrowLogExists = await context.SysMenus
+            .AnyAsync(m => m.PermCode == "system:borrow:list");
+        if (!borrowLogExists)
+        {
+            // 查找父级"业务中台"目录
+            var businessMenu = await context.SysMenus
+                .FirstOrDefaultAsync(m => m.PermCode == null && m.MenuType == 0 && m.Path == "/business");
+            if (businessMenu == null)
+            {
+                Console.WriteLine("   ⚠️  Skipped: 业务中台 (business menu) not found");
+            }
+            else
+            {
+                var borrowLogMenu = new SysMenu
+                {
+                    Title = "借阅日志",
+                    Path = "borrow-log",
+                    Component = "views/knowledge/borrow-log.vue",
+                    ParentId = businessMenu.Id,
+                    MenuType = 1,
+                    Icon = "Notebook",
+                    PermCode = "system:borrow:list",
+                    Sort = 2,
+                    Status = 1,
+                    CreateTime = DateTime.Now
+                };
+                context.SysMenus.Add(borrowLogMenu);
+                await context.SaveChangesAsync();
+
+                // 3. 将新菜单绑定到 admin 角色
+                var adminRole = await context.SysRoles
+                    .FirstOrDefaultAsync(r => r.RoleCode == "admin");
+                if (adminRole != null)
+                {
+                    var alreadyBound = await context.SysRoleMenus
+                        .AnyAsync(rm => rm.RoleId == adminRole.Id && rm.MenuId == borrowLogMenu.Id);
+                    if (!alreadyBound)
+                    {
+                        context.SysRoleMenus.Add(new SysRoleMenu
+                        {
+                            RoleId = adminRole.Id,
+                            MenuId = borrowLogMenu.Id
+                        });
+                    }
+                }
+
+                updated = true;
+                Console.WriteLine("   - Inserted: 借阅日志 menu (system:borrow:list)");
+                Console.WriteLine("   - Bound to: admin role");
+            }
+        }
+
+        if (updated)
+        {
+            await context.SaveChangesAsync();
+            Console.WriteLine("✅ Incremental update completed.");
+        }
+        else
+        {
+            Console.WriteLine("   - All data up-to-date, no changes needed.");
+        }
     }
 }
