@@ -102,15 +102,6 @@
 
     // 页面加载挂载
     onMounted(() => {
-        // // 守卫：在组件挂载的生命周期第一步，立刻审查
-        // const hasListPerm = permissionStore.hasPermission('system:knowledge:bookList')
-        
-        // if (!hasListPerm) {
-        //     ElMessage.error('抱歉，您暂无查看文献资产大盘的审计权限！')
-
-        //     return 
-        // }
-
         fetchBookList()
     })
 
