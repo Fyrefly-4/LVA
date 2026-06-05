@@ -701,6 +701,33 @@ export default api;
 
 查询前会将已超过 `ReturnTime` 且仍流转中的记录批量标记为 `2`，以保证逾期筛选结果准确。
 
+- **成功响应** (`code: 200`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "total": 1,
+    "items": [
+      {
+        "id": 3,
+        "bookId": 2,
+        "bookTitle": "企业级 SaaS 中台设计权限白皮书",
+        "isbn": "KB-2026-002",
+        "userId": 1,
+        "username": "admin",
+        "nickname": "超级管理员",
+        "borrowTime": "2026-06-04 10:30:00",
+        "returnTime": "2026-06-11 10:30:00",
+        "actualReturnTime": null,
+        "logStatus": 0
+      }
+    ]
+  }
+}
+```
+
 ### 7.5 新增文献
 
 - **URL**: `POST /api/knowledge/book`

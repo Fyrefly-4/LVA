@@ -263,6 +263,7 @@ public class KnowledgeService : IKnowledgeService
                 Id = l.Id,
                 BookId = l.BookId,
                 BookTitle = l.BookTitle,
+                Isbn = l.Book.Isbn,
                 UserId = l.UserId,
                 Username = l.Username,
                 Nickname = l.Nickname,

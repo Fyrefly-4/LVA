@@ -209,7 +209,7 @@ backend/
 - `KnowledgeBookDto`：`id`, `title`, `isbn`, `category`, `price`, `stock`, `status`, `createTime`
 - `KnowledgeBookSaveRequest`（新增/修改共用）：`title`（必填，100 字符）, `isbn`（必填，30 字符，唯一）, `category`（可空，50 字符）, `price`（decimal(10,2)）, `stock`（默认 0）, `status`（`1` 正常流转 / `0` 盘点维护中，默认 `1`）
 - `KnowledgeBorrowRequest`：`userId`, `bookIds[]`, `borrowDays`
-- `KnowledgeBorrowLogDto`：`id`, `bookId`, `bookTitle`, `userId`, `username`, `nickname`, `borrowTime`, `returnTime`, `actualReturnTime`（可空）, `logStatus`（`0` 流转中 / `1` 已归还 / `2` 逾期未还）
+- `KnowledgeBorrowLogDto`：`id`, `bookId`, `bookTitle`, `isbn`, `userId`, `username`, `nickname`, `borrowTime`, `returnTime`, `actualReturnTime`（可空）, `logStatus`（`0` 流转中 / `1` 已归还 / `2` 逾期未还）
 
 ---
 
