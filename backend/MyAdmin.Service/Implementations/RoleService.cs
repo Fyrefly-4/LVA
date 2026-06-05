@@ -120,7 +120,94 @@ public class RoleService : IRoleService
         if (!roleExists)
             throw new InvalidOperationException("角色不存在");
 
-        var flatMenus = await _dbContext.SysMenus
+        var allFlatMenus = await QueryEnabledMenuDtosAsync();
+
+        // 权限配置树仅展示需 HasPermission 鉴权的模块，排除 JWT 基础自助模块
+        var permissionFlatMenus = JwtBaselineMenuHelper.ExcludeFromPermissionTree(allFlatMenus);
+
+        var checkedMenuIds = await _dbContext.SysRoleMenus
+            .Where(rm => rm.RoleId == roleId)
+            .Select(rm => rm.MenuId)
+            .OrderBy(menuId => menuId)
+            .ToListAsync();
+
+        return new RolePermissionDto
+        {
+            AllMenus = MenuTreeBuilder.Build(permissionFlatMenus),
+            CheckedMenuIds = JwtBaselineMenuHelper.FilterCheckedMenuIds(allFlatMenus, checkedMenuIds)
+        };
+    }
+
+    public async Task SaveRolePermissionsAsync(int roleId, List<int> menuIds)
+    {
+        var roleExists = await _dbContext.SysRoles.AnyAsync(r => r.Id == roleId);
+        if (!roleExists)
+            throw new InvalidOperationException("角色不存在");
+
+        var allFlatMenus = await QueryEnabledMenuDtosAsync();
+        var jwtBaselineMenuIds = JwtBaselineMenuHelper.CollectSubtreeIds(allFlatMenus, JwtBaselineMenuHelper.BaselineRootTitles);
+
+        // 前端提交的勾选不含 JWT 基础模块，忽略误入的 Id
+        var editableMenuIds = (menuIds ?? new List<int>())
+            .Distinct()
+            .Where(id => !jwtBaselineMenuIds.Contains(id))
+            .ToList();
+
+        if (editableMenuIds.Count > 0)
+        {
+            var validMenuIds = await _dbContext.SysMenus
+                .Where(m => m.Status == 1 && editableMenuIds.Contains(m.Id))
+                .Select(m => m.Id)
+                .ToListAsync();
+
+            if (validMenuIds.Count != editableMenuIds.Count)
+                throw new InvalidOperationException("存在无效或已禁用的菜单/按钮 ID");
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        try
+        {
+            var existing = await _dbContext.SysRoleMenus
+                .Where(rm => rm.RoleId == roleId)
+                .ToListAsync();
+
+            // 保留角色上已有的 JWT 基础模块绑定，避免保存权限时误删
+            var preservedJwtBaselineIds = existing
+                .Where(rm => jwtBaselineMenuIds.Contains(rm.MenuId))
+                .Select(rm => rm.MenuId)
+                .ToList();
+
+            var finalMenuIds = editableMenuIds
+                .Union(preservedJwtBaselineIds)
+                .Distinct()
+                .ToList();
+
+            if (existing.Count > 0)
+                _dbContext.SysRoleMenus.RemoveRange(existing);
+
+            if (finalMenuIds.Count > 0)
+            {
+                var newBindings = finalMenuIds.Select(menuId => new SysRoleMenu
+                {
+                    RoleId = roleId,
+                    MenuId = menuId
+                });
+                await _dbContext.SysRoleMenus.AddRangeAsync(newBindings);
+            }
+
+            await _dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
+    private async Task<List<MenuTreeDto>> QueryEnabledMenuDtosAsync()
+    {
+        return await _dbContext.SysMenus
             .Where(m => m.Status == 1)
             .OrderBy(m => m.Sort)
             .ThenBy(m => m.Id)
@@ -137,66 +224,5 @@ public class RoleService : IRoleService
                 Sort = m.Sort
             })
             .ToListAsync();
-
-        var checkedMenuIds = await _dbContext.SysRoleMenus
-            .Where(rm => rm.RoleId == roleId)
-            .Select(rm => rm.MenuId)
-            .OrderBy(menuId => menuId)
-            .ToListAsync();
-
-        return new RolePermissionDto
-        {
-            AllMenus = MenuTreeBuilder.Build(flatMenus),
-            CheckedMenuIds = checkedMenuIds
-        };
-    }
-
-    public async Task SaveRolePermissionsAsync(int roleId, List<int> menuIds)
-    {
-        var roleExists = await _dbContext.SysRoles.AnyAsync(r => r.Id == roleId);
-        if (!roleExists)
-            throw new InvalidOperationException("角色不存在");
-
-        var distinctMenuIds = (menuIds ?? new List<int>()).Distinct().ToList();
-
-        if (distinctMenuIds.Count > 0)
-        {
-            var validMenuIds = await _dbContext.SysMenus
-                .Where(m => m.Status == 1 && distinctMenuIds.Contains(m.Id))
-                .Select(m => m.Id)
-                .ToListAsync();
-
-            if (validMenuIds.Count != distinctMenuIds.Count)
-                throw new InvalidOperationException("存在无效或已禁用的菜单/按钮 ID");
-        }
-
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
-        try
-        {
-            var existing = await _dbContext.SysRoleMenus
-                .Where(rm => rm.RoleId == roleId)
-                .ToListAsync();
-
-            if (existing.Count > 0)
-                _dbContext.SysRoleMenus.RemoveRange(existing);
-
-            if (distinctMenuIds.Count > 0)
-            {
-                var newBindings = distinctMenuIds.Select(menuId => new SysRoleMenu
-                {
-                    RoleId = roleId,
-                    MenuId = menuId
-                });
-                await _dbContext.SysRoleMenus.AddRangeAsync(newBindings);
-            }
-
-            await _dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
-        }
-        catch
-        {
-            await transaction.RollbackAsync();
-            throw;
-        }
     }
 }

@@ -77,7 +77,7 @@ backend/
 **核心逻辑**：
 - `LoginAsync`：验证用户名密码（BCrypt），生成 JWT，包含 NameIdentifier、Name、nickname、Role 声明
 - `GetCurrentUserInfoAsync`：通过 `SysUserRole → SysRoleMenu → SysMenu` 汇总权限码，返回 `UserInfoDto`（含 `roles` 与 `permissions`）
-- `GetCurrentUserMenusAsync`：查询 `MenuType = 0` 或 `1` 且 `Status = 1` 的菜单，返回扁平列表，由 Controller 递归组装为树
+- `GetCurrentUserMenusAsync`：查询角色绑定的 `MenuType = 0/1` 菜单，再 **无条件合并** `文献大厅`、`个人文献中心` 及 `业务中台` 目录，返回扁平列表，由 Controller 递归组装为树
 
 **相关 DTO**：
 - `LoginDto`：`username`, `password`
@@ -130,8 +130,8 @@ backend/
 **核心逻辑**：
 - `GetListAsync`：分页或全量查询角色
 - `CreateAsync` / `UpdateAsync`：校验 `RoleCode` 全局唯一
-- `GetRolePermissionsAsync`：查询 `Status = 1` 的全量菜单并递归为 `AllMenus`，查询 `SysRoleMenu` 得到 `CheckedMenuIds`
-- `SaveRolePermissionsAsync`：事务内先删后插同步 `SysRoleMenu`，支持空数组清空
+- `GetRolePermissionsAsync`：查询全量启用菜单，经 `JwtBaselineMenuHelper` **排除** JWT 基础自助模块后递归为 `AllMenus`；`CheckedMenuIds` 同步排除不可编辑节点
+- `SaveRolePermissionsAsync`：事务内先删后插同步可编辑权限；**保留**角色上已有的 JWT 基础模块 `SysRoleMenu` 绑定，忽略请求体中的对应 MenuId
 
 **相关 DTO**：
 - `RoleDto`：`id`, `roleName`, `roleCode`, `description`
@@ -155,7 +155,7 @@ backend/
 
 **权限码命名规范**：`system:{module}:{action}`，如 `system:user:create`、`system:knowledge:bookList`
 
-**当前全部 17 条权限树**：
+**当前全部 24 条权限树**：
 
 | 层级 | Title | PermCode | MenuType | 父级 |
 |------|-------|----------|----------|------|
@@ -169,13 +169,30 @@ backend/
 | 按钮 | 角色删除 | `system:role:delete` | 2 | 角色管理 |
 | 按钮 | 分配权限 | `system:role:assignPerm` | 2 | 角色管理 |
 | 目录 | 业务中台 | - | 0 | `null` |
-| 菜单 | 文献管理 | `system:knowledge:bookList` | 1 | 业务中台 |
-| 按钮 | 批量指派 | `system:knowledge:borrow` | 2 | 文献管理 |
-| 按钮 | 归还入库 | `system:knowledge:return` | 2 | 文献管理 |
-| 按钮 | 新增文献 | `system:knowledge:create` | 2 | 文献管理 |
-| 按钮 | 编辑文献 | `system:knowledge:edit` | 2 | 文献管理 |
-| 按钮 | 删除文献 | `system:knowledge:delete` | 2 | 文献管理 |
-| 菜单 | 借阅日志 | `system:borrow:list` | 1 | 业务中台 |
+| 菜单 | 文献大厅 | - | 1 | 业务中台 |
+| 按钮 | 浏览文献 | - | 2 | 文献大厅 |
+| 按钮 | 借阅文献 | - | 2 | 文献大厅 |
+| 菜单 | 个人文献中心 | - | 1 | 业务中台 |
+| 按钮 | 我的借阅 | - | 2 | 个人文献中心 |
+| 按钮 | 我的历史 | - | 2 | 个人文献中心 |
+| 按钮 | 自助归还 | - | 2 | 个人文献中心 |
+| 菜单 | 文献资产管理 | `system:knowledge:bookList` | 1 | 业务中台 |
+| 按钮 | 新增文献 | `system:knowledge:create` | 2 | 文献资产管理 |
+| 按钮 | 编辑文献 | `system:knowledge:edit` | 2 | 文献资产管理 |
+| 按钮 | 删除文献 | `system:knowledge:delete` | 2 | 文献资产管理 |
+| 菜单 | 流转审计日志 | `system:knowledge:adminLog` | 1 | 业务中台 |
+| 按钮 | 批量指派借阅 | `system:knowledge:borrow` | 2 | 流转审计日志 |
+| 按钮 | 管理员归还入库 | `system:knowledge:return` | 2 | 流转审计日志 |
+
+**角色菜单可见性**：
+
+| 角色 | Knowledge 侧边栏（`GET /api/auth/menus`） | 权限配置树（`GET /api/role/{id}/permissions`） |
+|------|------------------------------------------|---------------------------------------------|
+| 任意已登录用户 | 文献大厅、个人文献中心 **始终可见**（JWT 基础模块） | — |
+| `admin` | 另含文献资产管理、流转审计日志（按 `SysRoleMenu`） | 仅可勾选文献资产管理、流转审计日志及其按钮 |
+| `user` | 同上（大厅 + 个人中心固化；无管理员菜单） | 仅可勾选文献资产管理、流转审计日志及其按钮（若分配） |
+
+**辅助类**：`MyAdmin.Service/Helpers/JwtBaselineMenuHelper.cs` — 识别并过滤 `文献大厅`、`个人文献中心` 子树。
 
 > **注意**：`ParentId = null`（非 `0`），因为 `SysMenu` 表存在自关联外键约束 `FK_SysMenu_SysMenu_ParentId`。
 
@@ -194,7 +211,10 @@ backend/
 | `DELETE /api/knowledge/book/{id}` | 删除文献 | `system:knowledge:delete` |
 | `POST /api/knowledge/borrow` | 批量流转指派借阅 | `system:knowledge:borrow` |
 | `POST /api/knowledge/return/{logId}` | 办理资产归还入库 | `system:knowledge:return` |
-| `GET /api/knowledge/log/list` | 获取流转审计历史日志 | 仅需认证 |
+| `GET /api/knowledge/log/list` | 流转审计日志（管理员全量/普通用户仅自己） | 动态隔离（见下方） |
+| `POST /api/knowledge/borrow/self` | 普通用户自助借阅 | 仅需 JWT 认证 |
+| `GET /api/knowledge/log/my-list` | 获取当前用户个人借阅历史 | 仅需 JWT 认证 |
+| `POST /api/knowledge/return/self/{logId}` | 普通用户自助归还核销 | 仅需 JWT 认证 |
 
 **核心逻辑**：
 - `GetBookListAsync`：分页查询，按 `CreateTime DESC` 排序，支持 `keyword` 模糊搜索 `Title`/`Isbn`、`category` 精确筛选，使用 `AsNoTracking` 投影
@@ -203,12 +223,16 @@ backend/
 - `DeleteBookAsync`：校验文献存在后物理删除
 - `BorrowAsync`：`Serializable` 事务，校验用户状态、逐本校验库存和状态，扣减库存并批量写入 `SysBorrowLog`，任一步失败即回滚
 - `ReturnAsync`：事务内更新 `ActualReturnTime`、`LogStatus = 1`，回滚 `SysBook.Stock += 1`，已归还不可重复入库
-- `GetLogListAsync`：查询前将超期未还记录批量标记为 `LogStatus = 2`（逾期），支持按 `logStatus` 筛选
+- `GetLogListAsync`：**动态隔离** — 通过 `SysUserRole → SysRoleMenu → SysMenu` 检查当前用户是否拥有 `system:knowledge:adminLog` 权限：管理员查看全量大盘，普通用户强制 `.Where(x => x.UserId == currentUserId)` 仅返回自身数据。查询前批量标记逾期
+- `SelfBorrowAsync`：从 JWT 提取 `currentUserId`，校验单人额度上限（未还数 + 本次 ≤ 5 本）、禁止重复借阅同一文献，`Serializable` 事务内批量校验库存并扣减
+- `GetMyLogListAsync`：强制锁死 `currentUserId` 实现数据隔离，查询前批量标记逾期，返回个人借阅历史
+- `SelfReturnAsync`：所有权卡点校验 `logId + userId` 双条件匹配，防止横向越权，事务内回补库存
 
 **相关 DTO**：
 - `KnowledgeBookDto`：`id`, `title`, `isbn`, `category`, `price`, `stock`, `status`, `createTime`
 - `KnowledgeBookSaveRequest`（新增/修改共用）：`title`（必填，100 字符）, `isbn`（必填，30 字符，唯一）, `category`（可空，50 字符）, `price`（decimal(10,2)）, `stock`（默认 0）, `status`（`1` 正常流转 / `0` 盘点维护中，默认 `1`）
 - `KnowledgeBorrowRequest`：`userId`, `bookIds[]`, `borrowDays`
+- `KnowledgeSelfBorrowRequest`：`bookIds[]`, `borrowDays`（无 `userId`，由 JWT 自动提取）
 - `KnowledgeBorrowLogDto`：`id`, `bookId`, `bookTitle`, `isbn`, `userId`, `username`, `nickname`, `borrowTime`, `returnTime`, `actualReturnTime`（可空）, `logStatus`（`0` 流转中 / `1` 已归还 / `2` 逾期未还）
 
 ---

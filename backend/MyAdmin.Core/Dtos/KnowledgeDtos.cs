@@ -43,3 +43,9 @@ public class KnowledgeBorrowLogDto
     public string? ActualReturnTime { get; set; }
     public byte LogStatus { get; set; }
 }
+
+public class KnowledgeSelfBorrowRequest
+{
+    public List<int> BookIds { get; set; } = new();
+    public int BorrowDays { get; set; }
+}

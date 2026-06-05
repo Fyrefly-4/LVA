@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using MyAdmin.Core.Common;
 using MyAdmin.Core.Dtos;
 using MyAdmin.Infrastructure;
+using MyAdmin.Service.Helpers;
 using MyAdmin.Service.Interfaces;
 
 namespace MyAdmin.Service.Implementations;
@@ -84,7 +85,7 @@ public class AuthService : IAuthService
 
     public async Task<List<MenuTreeDto>> GetCurrentUserMenusAsync(int userId)
     {
-        var menus = await (
+        var roleMenus = await (
             from userRole in _dbContext.SysUserRoles
             join roleMenu in _dbContext.SysRoleMenus on userRole.RoleId equals roleMenu.RoleId
             join menu in _dbContext.SysMenus on roleMenu.MenuId equals menu.Id
@@ -106,7 +107,31 @@ public class AuthService : IAuthService
             })
             .ToListAsync();
 
-        return menus
+        // JWT 基础自助模块：文献大厅、个人文献中心（及业务中台父目录）向所有合法用户无条件放行
+        var jwtBaselineMenus = await _dbContext.SysMenus
+            .Where(m => m.Status == 1
+                        && (m.MenuType == 0 || m.MenuType == 1)
+                        && (m.Title == "文献大厅"
+                            || m.Title == "个人文献中心"
+                            || (m.MenuType == 0 && m.Path == "/business")))
+            .OrderBy(m => m.Sort)
+            .ThenBy(m => m.Id)
+            .Select(m => new MenuTreeDto
+            {
+                Id = m.Id,
+                ParentId = m.ParentId,
+                Title = m.Title,
+                Path = m.Path,
+                Component = m.Component,
+                PermCode = m.PermCode,
+                MenuType = m.MenuType,
+                Icon = m.Icon,
+                Sort = m.Sort
+            })
+            .ToListAsync();
+
+        return roleMenus
+            .Concat(jwtBaselineMenus)
             .GroupBy(menu => menu.Id)
             .Select(group => group.First())
             .OrderBy(menu => menu.Sort)

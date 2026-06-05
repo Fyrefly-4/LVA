@@ -11,5 +11,8 @@ public interface IKnowledgeService
     Task DeleteBookAsync(int id);
     Task BorrowAsync(KnowledgeBorrowRequest request);
     Task ReturnAsync(int logId);
-    Task<PagedResult<KnowledgeBorrowLogDto>> GetLogListAsync(int pageIndex, int pageSize, byte? logStatus);
+    Task<PagedResult<KnowledgeBorrowLogDto>> GetLogListAsync(int currentUserId, int pageIndex, int pageSize, byte? logStatus);
+    Task SelfBorrowAsync(int currentUserId, KnowledgeSelfBorrowRequest request);
+    Task<PagedResult<KnowledgeBorrowLogDto>> GetMyLogListAsync(int currentUserId, int pageIndex, int pageSize, byte? logStatus);
+    Task SelfReturnAsync(int currentUserId, int logId);
 }

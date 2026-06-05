@@ -108,7 +108,8 @@ Authorization: Bearer <token>
   - 返回当前登录用户可访问的菜单树形结构
   - 仅包含 `MenuType = 0`（目录）和 `MenuType = 1`（菜单）的启用菜单，不包含按钮类型（`MenuType = 2`）
   - 后端递归组装为树形结构，同一层按 `sort` 升序、`id` 升序排列
-  - 菜单项通过 `SysUserRole -> SysRoleMenu -> SysMenu` 关联链路获取，自动去重
+  - 菜单项通过 `SysUserRole -> SysRoleMenu -> SysMenu` 关联链路获取，并与 **JWT 基础自助模块** 合并后自动去重
+  - **无条件放行**：`文献大厅`、`个人文献中心` 及 `业务中台` 父目录对所有已登录用户始终返回（不依赖角色勾选），确保 Admin 与普通用户侧边栏均可见
 - **成功响应**:
 
 ```json
@@ -458,12 +459,13 @@ Authorization: Bearer <token>
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| allMenus | MenuTreeDto[] | 全量启用菜单树（目录 0 / 菜单 1 / 按钮 2），按 `Sort`、`Id` 升序递归 |
-| checkedMenuIds | int[] | 当前角色已绑定的 MenuId，供 `el-tree.setCheckedKeys()` |
+| allMenus | MenuTreeDto[] | 可分配的权限配置树（目录 0 / 菜单 1 / 按钮 2），按 `Sort`、`Id` 升序递归 |
+| checkedMenuIds | int[] | 当前角色已绑定的可编辑 MenuId，供 `el-tree.setCheckedKeys()` |
 
 - **业务说明**:
-  - `allMenus` 来自 `SysMenu` 且 `Status = 1`
-  - `checkedMenuIds` 来自 `SysRoleMenu` 中该 `RoleId` 的记录
+  - `allMenus` 来自 `SysMenu` 且 `Status = 1`，但 **排除** `文献大厅`、`个人文献中心` 及其全部子孙节点（JWT 基础自助模块，固化权限，不在后台勾选）
+  - 业务中台下权限树仅展示 **文献资产管理**、**流转审计日志** 两个需 `HasPermission` 鉴权的大模块
+  - `checkedMenuIds` 来自 `SysRoleMenu`，同样排除上述 JWT 基础模块的 Id，避免 el-tree 回显不可编辑节点
 
 ---
 
@@ -481,9 +483,9 @@ Authorization: Bearer <token>
 - **成功响应**: `data` 为 `null`
 - **业务说明**（事务内执行）:
   1. 校验角色存在
-  2. 校验 `menuIds` 均为启用中的有效菜单 ID
-  3. 删除 `SysRoleMenu` 中该角色旧关联
-  4. 批量插入新关联
+  2. 忽略请求体中误入的 JWT 基础模块 MenuId（`文献大厅`、`个人文献中心` 子树）
+  3. 校验其余 `menuIds` 均为启用中的有效菜单 ID
+  4. 删除 `SysRoleMenu` 中该角色旧关联后批量插入；**保留**该角色上已有的 JWT 基础模块绑定，防止保存权限时误删
 
 **前端示例**:
 
@@ -529,7 +531,8 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 ### 与前端 v-has-perm 的关系
 
 - `GET /api/auth/info` 返回的 `permissions` 数组包含 **MenuType = 2（按钮级）** 的 `PermCode`（如 `system:user:create`），与 `[HasPermission]` 校验口径一致。
-- 动态侧边栏菜单使用 `GET /api/auth/menus`，仅返回目录与菜单（`MenuType` 0、1），不含按钮节点。
+- 动态侧边栏菜单使用 `GET /api/auth/menus`，仅返回目录与菜单（`MenuType` 0、1），不含按钮节点；`文献大厅`、`个人文献中心` 对所有合法用户无条件并入，与角色勾选无关。
+- 角色权限配置树使用 `GET /api/role/{id}/permissions`，不含 JWT 基础自助模块，仅用于分配 `HasPermission` 类权限。
 
 ### 已接入 HasPermission 的接口示例
 
@@ -565,7 +568,7 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 管理员 | `admin` | 超级管理员 |
 | 普通用户 | `user` | 普通用户 |
 
-### 菜单权限树（共 17 条）
+### 菜单权限树（共 24 条）
 
 | 层级 | Title | Path | Component | PermCode | MenuType | ParentId |
 |------|-------|------|-----------|----------|----------|----------|
@@ -579,20 +582,37 @@ public async Task<ActionResult<ApiResponse<object?>>> Delete(int id)
 | 按钮 | 角色删除 | - | - | `system:role:delete` | 2 | 角色管理.Id |
 | 按钮 | 分配权限 | - | - | `system:role:assignPerm` | 2 | 角色管理.Id |
 | 目录 | 业务中台 | `/business` | `Layout` | - | 0 | `null`（根节点） |
-| 菜单 | 文献管理 | `knowledge` | `views/knowledge/book.vue` | `system:knowledge:bookList` | 1 | 业务中台.Id |
-| 按钮 | 批量指派 | - | - | `system:knowledge:borrow` | 2 | 文献管理.Id |
-| 按钮 | 归还入库 | - | - | `system:knowledge:return` | 2 | 文献管理.Id |
-| 按钮 | 新增文献 | - | - | `system:knowledge:create` | 2 | 文献管理.Id |
-| 按钮 | 编辑文献 | - | - | `system:knowledge:edit` | 2 | 文献管理.Id |
-| 按钮 | 删除文献 | - | - | `system:knowledge:delete` | 2 | 文献管理.Id |
-| 菜单 | 借阅日志 | `borrow-log` | `views/knowledge/borrow-log.vue` | `system:borrow:list` | 1 | 业务中台.Id |
+| 菜单 | 文献大厅 | `hall` | `views/knowledge/hall.vue` | - | 1 | 业务中台.Id |
+| 按钮 | 浏览文献 | - | - | - | 2 | 文献大厅.Id |
+| 按钮 | 借阅文献 | - | - | - | 2 | 文献大厅.Id |
+| 菜单 | 个人文献中心 | `personal` | `views/knowledge/personal.vue` | - | 1 | 业务中台.Id |
+| 按钮 | 我的借阅 | - | - | - | 2 | 个人文献中心.Id |
+| 按钮 | 我的历史 | - | - | - | 2 | 个人文献中心.Id |
+| 按钮 | 自助归还 | - | - | - | 2 | 个人文献中心.Id |
+| 菜单 | 文献资产管理 | `knowledge` | `views/knowledge/book.vue` | `system:knowledge:bookList` | 1 | 业务中台.Id |
+| 按钮 | 新增文献 | - | - | `system:knowledge:create` | 2 | 文献资产管理.Id |
+| 按钮 | 编辑文献 | - | - | `system:knowledge:edit` | 2 | 文献资产管理.Id |
+| 按钮 | 删除文献 | - | - | `system:knowledge:delete` | 2 | 文献资产管理.Id |
+| 菜单 | 流转审计日志 | `audit-log` | `views/knowledge/audit-log.vue` | `system:knowledge:adminLog` | 1 | 业务中台.Id |
+| 按钮 | 批量指派借阅 | - | - | `system:knowledge:borrow` | 2 | 流转审计日志.Id |
+| 按钮 | 管理员归还入库 | - | - | `system:knowledge:return` | 2 | 流转审计日志.Id |
 
 > 根节点 `ParentId = null`（非 `0`），因为 `SysMenu` 表存在自关联外键约束，`ParentId = 0` 会触发 FK 冲突。
 
 ### 关联绑定
 
 - **用户角色**：`admin` 用户 ↔ `admin` 角色
-- **角色菜单**：`admin` 角色 ↔ 上述全部 17 条菜单/按钮（管理员拥有全栈权限）
+- **角色菜单（admin）**：`admin` 角色 ↔ 上述全部 24 条菜单/按钮（管理员拥有全栈权限）
+- **角色菜单（user）**：`user` 角色 ↔ 业务中台目录 + 文献大厅 + 个人文献中心及其子按钮（共 8 条，仅 JWT 可见，不含 `system:knowledge:*` 权限码）
+
+### JWT 基础自助模块（权限树与动态菜单分流）
+
+| 模块 | `GET /api/auth/menus`（侧边栏） | `GET /api/role/{id}/permissions`（权限配置树） |
+|------|--------------------------------|-----------------------------------------------|
+| 文献大厅 + 子按钮 | 所有合法用户无条件可见 | **不展示、不可勾选** |
+| 个人文献中心 + 子按钮 | 所有合法用户无条件可见 | **不展示、不可勾选** |
+| 文献资产管理 + CRUD 按钮 | 按角色 `SysRoleMenu` 绑定 | 可展示、可勾选 |
+| 流转审计日志 + 管理员按钮 | 按角色 `SysRoleMenu` 绑定 | 可展示、可勾选 |
 
 ---
 
@@ -630,7 +650,9 @@ export default api;
 
 ## 7. 文献管理系统 (Knowledge)
 
-> 以下接口均需认证；所有接口已接入 `[HasPermission]` 细粒度鉴权（流转审计日志除外，仅需认证）。
+> 以下接口均需认证；CRUD 和指派/归还接口已接入 `[HasPermission]` 细粒度鉴权，自助借阅/归还/个人历史接口仅需 JWT 认证。
+> 
+> **动态隔离**：`GET /api/knowledge/log/list` 接口根据当前用户是否拥有 `system:knowledge:adminLog` 权限自动切换行为：管理员查全量大盘，普通用户仅能查看自己的日志。
 
 ### 7.1 条件分页获取文献资产列表
 
@@ -691,6 +713,10 @@ export default api;
 ### 7.4 获取流转审计历史日志
 
 - **URL**: `GET /api/knowledge/log/list`
+- **认证**: 需登录（JWT），无需额外权限码
+- **动态隔离**: 后端通过 JWT 解析 `currentUserId`，检查用户是否拥有 `system:knowledge:adminLog` 权限：
+  - **管理员**：返回全量流转日志（审计大盘）
+  - **普通用户**：强制 `.Where(x => x.UserId == currentUserId)` 仅返回自身日志，阻断隐私外泄
 - **Query 参数**:
 
 | 参数 | 类型 | 必填 | 说明 |
@@ -728,7 +754,130 @@ export default api;
 }
 ```
 
-### 7.5 新增文献
+### 7.5 普通用户自助借阅
+
+- **URL**: `POST /api/knowledge/borrow/self`
+- **认证**: 需登录（JWT），无需额外权限码
+- **安全**: 不接收 `userId`，由后端从 JWT Claim 自动提取当前用户身份
+- **请求体**:
+
+```json
+{
+  "bookIds": [1, 2],
+  "borrowDays": 14
+}
+```
+
+`KnowledgeSelfBorrowRequest` 字段说明：
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| bookIds | int[] | 是 | 拟借文献 ID 列表 |
+| borrowDays | int | 是 | 借阅天数，必须 > 0 |
+
+**业务防御规则**（任一不满足即返回 500 错误）：
+
+1. 单人额度熔断：`当前未还数 + 本次拟借数 > 5` → `"您的借阅额度已满（单人上限 5 本），请先归还现有文献。"`
+2. 禁止重复借阅：该用户已借阅同一文献且未归还 → `"您已借阅过文献《XXX》，在归还前无需重复借阅。"`
+3. 库存校验：文献 `Stock <= 0` 或 `Status != 1` → 提示库存不足/维护中
+4. 事务落库：`Serializable` 隔离级别，批量扣减库存 + 写入 `SysBorrowLog`，任一步失败全量回滚
+
+- **成功响应** (`code: 200`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+- **失败响应** (`code: 200`，通过 `code` 字段区分):
+
+```json
+{
+  "code": 500,
+  "message": "您的借阅额度已满（单人上限 5 本），请先归还现有文献。",
+  "data": null
+}
+```
+
+### 7.6 获取当前用户个人借阅历史
+
+- **URL**: `GET /api/knowledge/log/my-list`
+- **认证**: 需登录（JWT），无需额外权限码
+- **安全**: 后端强锁 `currentUserId`，只能查看自己的借阅记录
+- **Query 参数**:
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| pageIndex | int | 否 | 页码，默认 `1` |
+| pageSize | int | 否 | 每页条数，默认 `10` |
+| logStatus | byte | 否 | `0` 流转中，`1` 已归还，`2` 逾期未还 |
+
+查询前会对当前用户已过应还时间的记录自动标记逾期。
+
+- **成功响应** (`code: 200`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "total": 1,
+    "items": [
+      {
+        "id": 3,
+        "bookId": 2,
+        "bookTitle": "企业级 SaaS 中台设计权限白皮书",
+        "isbn": "KB-2026-002",
+        "userId": 1,
+        "username": "admin",
+        "nickname": "超级管理员",
+        "borrowTime": "2026-06-04 10:30:00",
+        "returnTime": "2026-06-11 10:30:00",
+        "actualReturnTime": null,
+        "logStatus": 0
+      }
+    ]
+  }
+}
+```
+
+### 7.7 普通用户自助归还
+
+- **URL**: `POST /api/knowledge/return/self/{logId}`
+- **认证**: 需登录（JWT），无需额外权限码
+- **安全**: 所有权卡点校验，同时匹配 `logId` 和 `currentUserId`，防止横向越权
+- **URL 参数**: `logId` 流转日志 ID
+
+**防御规则**：
+
+1. 所有权校验：`log.Id == logId && log.UserId == currentUserId` 双条件匹配，不匹配 → `"未找到该借阅记录，或无权操作此记录"`
+2. 重复归还防护：已归还记录不可重复入库
+3. 事务核销：更新 `ActualReturnTime`、`LogStatus = 1`，回补 `SysBook.Stock += 1`
+
+- **成功响应** (`code: 200`):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": null
+}
+```
+
+- **失败响应**（越权） (`code: 200`):
+
+```json
+{
+  "code": 500,
+  "message": "未找到该借阅记录，或无权操作此记录",
+  "data": null
+}
+```
+
+### 7.8 新增文献
 
 - **URL**: `POST /api/knowledge/book`
 - **权限码**: `system:knowledge:create`
@@ -776,7 +925,7 @@ export default api;
 }
 ```
 
-### 7.6 修改文献
+### 7.9 修改文献
 
 - **URL**: `PUT /api/knowledge/book/{id}`
 - **权限码**: `system:knowledge:edit`
@@ -813,7 +962,7 @@ export default api;
 }
 ```
 
-### 7.7 删除文献
+### 7.10 删除文献
 
 - **URL**: `DELETE /api/knowledge/book/{id}`
 - **权限码**: `system:knowledge:delete`
@@ -838,7 +987,7 @@ export default api;
 }
 ```
 
-### 7.8 权限码汇总
+### 7.11 权限码汇总
 
 | 接口 | 权限码 |
 |------|--------|
@@ -848,3 +997,7 @@ export default api;
 | `GET /api/knowledge/book/list` | `system:knowledge:bookList` |
 | `POST /api/knowledge/borrow` | `system:knowledge:borrow` |
 | `POST /api/knowledge/return/{logId}` | `system:knowledge:return` |
+| `GET /api/knowledge/log/list` | 动态隔离（管理员全量/普通用户仅自己） |
+| `POST /api/knowledge/borrow/self` | 仅需 JWT 认证 |
+| `GET /api/knowledge/log/my-list` | 仅需 JWT 认证 |
+| `POST /api/knowledge/return/self/{logId}` | 仅需 JWT 认证 |

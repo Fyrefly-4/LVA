@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MyAdmin.Core.Common;
@@ -121,12 +122,73 @@ public class KnowledgeController : ControllerBase
     {
         try
         {
-            var result = await _knowledgeService.GetLogListAsync(pageIndex, pageSize, logStatus);
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Ok(ApiResponse<PagedResult<KnowledgeBorrowLogDto>>.Fail("无法识别当前登录用户"));
+
+            var result = await _knowledgeService.GetLogListAsync(currentUserId, pageIndex, pageSize, logStatus);
             return Ok(ApiResponse<PagedResult<KnowledgeBorrowLogDto>>.Success(result));
         }
         catch (Exception ex)
         {
             return Ok(ApiResponse<PagedResult<KnowledgeBorrowLogDto>>.Fail(ex.Message));
+        }
+    }
+
+    [HttpPost("borrow/self")]
+    public async Task<ActionResult<ApiResponse<object?>>> SelfBorrow([FromBody] KnowledgeSelfBorrowRequest request)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Ok(ApiResponse<object?>.Fail("无法识别当前登录用户"));
+
+            await _knowledgeService.SelfBorrowAsync(currentUserId, request);
+            return Ok(ApiResponse<object?>.Success(null));
+        }
+        catch (Exception ex)
+        {
+            return Ok(ApiResponse<object?>.Fail(ex.Message));
+        }
+    }
+
+    [HttpGet("log/my-list")]
+    public async Task<ActionResult<ApiResponse<PagedResult<KnowledgeBorrowLogDto>>>> GetMyLogList(
+        [FromQuery] int pageIndex = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] byte? logStatus = null)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Ok(ApiResponse<PagedResult<KnowledgeBorrowLogDto>>.Fail("无法识别当前登录用户"));
+
+            var result = await _knowledgeService.GetMyLogListAsync(currentUserId, pageIndex, pageSize, logStatus);
+            return Ok(ApiResponse<PagedResult<KnowledgeBorrowLogDto>>.Success(result));
+        }
+        catch (Exception ex)
+        {
+            return Ok(ApiResponse<PagedResult<KnowledgeBorrowLogDto>>.Fail(ex.Message));
+        }
+    }
+
+    [HttpPost("return/self/{logId:int}")]
+    public async Task<ActionResult<ApiResponse<object?>>> SelfReturn(int logId)
+    {
+        try
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !int.TryParse(userIdClaim, out var currentUserId))
+                return Ok(ApiResponse<object?>.Fail("无法识别当前登录用户"));
+
+            await _knowledgeService.SelfReturnAsync(currentUserId, logId);
+            return Ok(ApiResponse<object?>.Success(null));
+        }
+        catch (Exception ex)
+        {
+            return Ok(ApiResponse<object?>.Fail(ex.Message));
         }
     }
 }
