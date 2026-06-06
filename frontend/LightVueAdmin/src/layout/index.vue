@@ -11,7 +11,7 @@
     const route = useRoute()
     const permissionStore = usePermissionStore()
 
-    const nickname = computed(() => permissionStore.nickname || 管理员)
+    const nickname = computed(() => permissionStore.nickname || '管理员')
 
     const handleLogout = () => {
         localStorage.removeItem('token')
@@ -49,7 +49,7 @@
                     </div>
 
                     <div>
-                        <el-dropdown>
+                        <el-dropdown >
                             <span style="cursor: pointer; display: flex; align-items: center;">
                                 欢迎您, {{ nickname }}
                             </span>

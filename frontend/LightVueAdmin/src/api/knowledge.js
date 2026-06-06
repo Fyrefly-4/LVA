@@ -105,3 +105,48 @@ export const getBorrowLogs = (params) => {
         params
     })
 }
+
+// ——— 以下为 普通用户自助流转接口 (仅需 JWT 认证) ───
+
+/**
+ * 8. 普通用户自助借阅文献资产
+ * @param {Object} data - 自助借阅 Payload
+ * @param {Array<number>} data.bookIds - 拟接文献 ID 列表
+ * @param {number} data.borrowDays - 借阅天数 (必须 > 0) 
+ */
+export const selfBorrowBooks = (data) => {
+    return request({
+        url: '/api/knowledge/borrow/self',
+        method: 'post',
+        data
+    })
+}
+
+
+/**
+ * 9. 获取当前用户个人借阅历史
+ * @param {Object} params - 过滤参数
+ * @param {number} params.pageIndex - 当前页码
+ * @param {number} params.pageSize - 每条页数
+ * @param {number} [params.logStatus] - 状态筛选 (0:流转中, 1:已归还, 2:逾期未还)
+ * @returns {Promise} 分页响应体 { total: 0, items: [] }
+ */
+export const getMyBorrowLogs = (params) => {
+    return request({
+        url: '/api/knowledge/log/my-list',
+        method: 'get',
+        params
+    })
+}
+
+
+/**
+ * 10. 普通用户自助归还文献资产
+ * @param {number|string} logId - 流转日志 ID
+ */
+export const selfReturnBook = (logId) => {
+    return request({
+        url: `/api/knowledge/return/self/${logId}`,
+        method: 'post'
+    })
+}
