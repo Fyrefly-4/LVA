@@ -26,7 +26,7 @@ public class KnowledgeService : IKnowledgeService
         pageIndex = pageIndex < 1 ? 1 : pageIndex;
         pageSize = pageSize < 1 ? 10 : pageSize;
 
-        var query = _dbContext.SysBooks.AsNoTracking().AsQueryable();
+        var query = _dbContext.SysBooks.AsNoTracking().AsQueryable().Where(b => b.Status != 2);
 
         if (!string.IsNullOrWhiteSpace(keyword))
         {
@@ -131,7 +131,12 @@ public class KnowledgeService : IKnowledgeService
         var book = await _dbContext.SysBooks.FirstOrDefaultAsync(b => b.Id == id)
             ?? throw new InvalidOperationException("文献不存在");
 
-        _dbContext.SysBooks.Remove(book);
+        var hasActiveBorrow = await _dbContext.SysBorrowLogs
+            .AnyAsync(l => l.BookId == id && l.LogStatus == 0);
+        if (hasActiveBorrow)
+            throw new InvalidOperationException("当前仍有文献流转在读者手中，无法强行销毁");
+
+        book.Status = 2;
         await _dbContext.SaveChangesAsync();
     }
 

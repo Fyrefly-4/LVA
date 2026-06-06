@@ -66,7 +66,6 @@ public class KnowledgeController : ControllerBase
     }
 
     [HttpGet("book/list")]
-    [HasPermission("system:knowledge:bookList")]
     public async Task<ActionResult<ApiResponse<PagedResult<KnowledgeBookDto>>>> GetBookList(
         [FromQuery] int pageIndex = 1,
         [FromQuery] int pageSize = 10,

@@ -657,7 +657,8 @@ export default api;
 ### 7.1 条件分页获取文献资产列表
 
 - **URL**: `GET /api/knowledge/book/list`
-- **权限码**: `system:knowledge:bookList`
+- **认证**: 仅需 JWT 认证（无需权限码）
+- **说明**: 返回正常流转中的文献，**自动过滤 `Status = 2`（已下架/逻辑删除）的文献**
 - **Query 参数**:
 
 | 参数 | 类型 | 必填 | 说明 |
@@ -903,7 +904,7 @@ export default api;
 | category | string? | 否 | 文献分类，最大 50 字符 |
 | price | decimal | 否 | 价格，精度 decimal(10,2) |
 | stock | int | 否 | 库存数量，默认 0 |
-| status | byte | 否 | 状态：`1` 正常流转，`0` 盘点维护中，默认 `1` |
+| status | byte | 否 | 状态：`1` 正常流转，`0` 盘点维护中，`2` 已下架（逻辑删除），默认 `1` |
 
 - **成功响应** (`code: 200`):
 
@@ -966,6 +967,10 @@ export default api;
 
 - **URL**: `DELETE /api/knowledge/book/{id}`
 - **权限码**: `system:knowledge:delete`
+- **说明**: 
+  - 先校验是否有 `LogStatus = 0`（流转中）的记录，如有则拒绝删除
+  - 若无则**逻辑删除**（更新 `Status = 2`），保留文献档案和所有历史借阅日志
+  - **级联删除已禁用**，确保历史记录不丢失
 
 - **成功响应** (`code: 200`):
 
@@ -982,8 +987,14 @@ export default api;
 ```json
 {
   "code": 500,
-  "message": "文献不存在",
-  "data": null
+  "message": "文献不存在"
+}
+```
+
+```json
+{
+  "code": 500,
+  "message": "当前仍有文献流转在读者手中，无法强行销毁"
 }
 ```
 
@@ -994,7 +1005,7 @@ export default api;
 | `POST /api/knowledge/book` | `system:knowledge:create` |
 | `PUT /api/knowledge/book/{id}` | `system:knowledge:edit` |
 | `DELETE /api/knowledge/book/{id}` | `system:knowledge:delete` |
-| `GET /api/knowledge/book/list` | `system:knowledge:bookList` |
+| `GET /api/knowledge/book/list` | 仅需 JWT 认证 |
 | `POST /api/knowledge/borrow` | `system:knowledge:borrow` |
 | `POST /api/knowledge/return/{logId}` | `system:knowledge:return` |
 | `GET /api/knowledge/log/list` | 动态隔离（管理员全量/普通用户仅自己） |

@@ -134,7 +134,7 @@ public class MyAdminDbContext : DbContext
             entity.HasOne(e => e.Book)
                 .WithMany(e => e.BorrowLogs)
                 .HasForeignKey(e => e.BookId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne(e => e.User)
                 .WithMany(e => e.BorrowLogs)

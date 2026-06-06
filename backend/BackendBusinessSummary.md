@@ -422,8 +422,8 @@
   - `Category` nvarchar(50)
   - `Price` decimal(10,2)
   - `Stock` int 默认 `0`
-  - `Status` tinyint 默认 `1`，`1` 正常流转，`0` 盘点维护中
-  - `CreateTime` datetime 默认 `GETDATE()`
+- `Status` tinyint 默认 `1`，`1` 正常流转，`0` 盘点维护中
+- `CreateTime` datetime 默认 `GETDATE()`
 
 - `SysBorrowLog`
   - `Id` int PK 自增

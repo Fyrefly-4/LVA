@@ -5,8 +5,10 @@
     import { getBorrowLogs, returnBook, getBookList, borrowBooks } from '@/api/knowledge';
     import { getUserList } from '@/api/user'
     import { throttle } from '@/utils/tool'
+import { selfBorrowBooks } from '../../api/knowledge';
 
     const tableData = ref([])
+    const selectedLogIds = ref([])
     const total = ref(0)
     const loading = ref(false)
 
@@ -176,6 +178,50 @@
 
     const submitForm = throttle(doSubmit, 1500)
 
+    const handleSelectionChange = (selection) => {
+        selectedLogIds.value = selection.map(row => row.id)
+    }
+
+    const handleSizeChange = (val) => {
+        queryParams.pageSize = val
+        queryParams.pageIndex = 1
+        fetchLogList()
+    }
+
+    const handleCurrentChange = (val) => {
+        queryParams.pageIndex = val
+        fetchLogList()
+    }
+
+    const handleBatchReturn = async () => {
+        if(selectedLogIds.value.length === 0) return
+
+        try {
+            await ElMessageBox.confirm(
+                `确认要将这 ${selectedLogIds.value.length} 项流转记录强行核销归还入库吗？`,
+                '系统审计核销警告',
+                { confirmButtonText: '强制核销', cancelButtonText: '取消', type: 'warning' }
+            )
+            loading.value = true
+
+            // 并发申请
+            const promises = selectedLogIds.value.map(id => returnBook(id))
+            await Promise.allSettled(promises)
+
+            ElMessage.success('批量资产归还核销成功！')
+            selectedLogIds.value = []
+            await fetchLogList()
+
+        } catch (error) {
+            if (error?.toString() !== 'cancel') {
+                console.error('批量核销失败:', error)
+                ElMessage.error('批量核销部分记录时出现异常')
+            }
+        } finally {
+            loading.value = false
+        }
+    }
+
 </script>
 
 <template>
@@ -183,23 +229,37 @@
         <h3 class="page-title">资产借阅与流转历史审计中心</h3>
 
         <div class="search-bar">
-            <el-radio-group v-model="queryParams.logStatus" @change="handleSearch">
-                <el-radio :value="''">全部记录</el-radio>
-                <el-radio :value="0">流转中</el-radio>
-                <el-radio :value="1">已归还</el-radio>
-                <el-radio :value="2">逾期未还</el-radio>
-            </el-radio-group>
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <el-radio-group v-model="queryParams.logStatus" @change="handleSearch">
+                    <el-radio :value="''">全部记录</el-radio>
+                    <el-radio :value="0">流转中</el-radio>
+                    <el-radio :value="1">已归还</el-radio>
+                    <el-radio :value="2">逾期未还</el-radio>
+                </el-radio-group>
 
-            <el-button type="primary" @click="handleSearch">刷新审计流</el-button>
-            <el-button @click="handleReset">重置</el-button>
-            <el-button
-                type="warning"
-                style="margin-left: auto;"
-                @click="openBorrowDialog"
-                v-has-perm="'system:knowledge:borrow'"
-            >
-                批量指派借阅
-            </el-button>
+                <el-button type="primary" @click="handleSearch">刷新审计流</el-button>
+                <el-button @click="handleReset">重置</el-button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <el-button
+                    type="primary"
+                    style="margin-left: auto;"
+                    @click="openBorrowDialog"
+                    v-has-perm="'system:knowledge:borrow'"
+                >
+                    批量指派借阅
+                </el-button>
+
+                <el-button
+                    type="warning"
+                    :disabled="selectedLogIds.length === 0"
+                    @click="handleBatchReturn"
+                    v-has-perm="'system:knowledge:return'"
+                >
+                    批量核销归还 (已选 {{ selectedLogIds.length }} 项)
+                </el-button>
+            </div>
         </div>
 
         <div class="table-wrapper">
@@ -242,8 +302,16 @@
             </el-table>
         </div>
 
-        <div calss="pagination-container">
-
+        <div class="pagination-container">
+            <el-pagination
+                v-model:current-page="queryParams.pageIndex"
+                v-model:page-size="queryParams.pageSize"
+                :page-sizes="[10, 20, 50, 100]"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="total"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+            />
         </div>
 
         <el-dialog v-model="dialogVisible" title="发起资产批量流转指派" width="700px" destroy-on-close>
@@ -265,16 +333,22 @@
                     <div style="font-size: 12px; color: #909399; margin-top: 4px;">单位（天），最长允许指派 365 天。</div>
                 </el-form-item>
 
-                <el-form-item label="挑选指派文献" prop="bookIds">
-                    <el-transfer
-                        v-model="formModel.bookIds"
-                        :data="bookTransferData"
-                        :titles="['可指派文献仓', '已选中指派队列']"
-                        button-text
-                        filter-placeholder="按书名搜索"
-                        filterable
-                        style="display: inline-block; text-align: left;"
-                    />
+                <el-form-item 
+                    label="挑选指派文献" 
+                    prop="bookIds"
+                    style="display: block; margin-top: 20px;"
+                >
+                    <div div class="transfer-responsive-wrapper" style="width: 100%; margin-top: 8px;">
+                        <el-transfer
+                            v-model="formModel.bookIds"
+                            :data="bookTransferData"
+                            :titles="['可指派文献仓', '已选中指派队列']"
+                            button-text
+                            filter-placeholder="按书名搜索"
+                            filterable
+                            class="dynamic-transfer"
+                        />
+                    </div>
                 </el-form-item>
             </el-form>
 
@@ -309,6 +383,10 @@
         display: flex;
         align-items: center;
         gap: 12px;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        padding: 12px;
+        border-radius: 4px;
     }
 
     .pagination-container {
@@ -361,6 +439,40 @@
 
     :deep(.el-form-item) {
         align-items: flex-start;    
+    }
+
+    .dynamic-transfer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        gap: 8px;
+    }
+
+    :deep(.el-transfer-panel) {
+        flex: 1; 
+        min-width: 180px; 
+        max-width: 45%; 
+        transition: all 0.3s ease;
+    }
+
+
+    :deep(.el-transfer-panel__body) {
+        width: 100%;
+    }
+
+    :deep(.el-transfer-panel .el-input__inner) {
+        width: 100%;
+    }
+
+
+    :deep(.el-transfer__buttons) {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 0 4px;
     }
 
 </style>

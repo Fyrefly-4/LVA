@@ -205,7 +205,7 @@ backend/
 
 | 接口 | 说明 | 权限码 |
 |------|------|--------|
-| `GET /api/knowledge/book/list` | 条件分页获取文献资产列表 | `system:knowledge:bookList` |
+| `GET /api/knowledge/book/list` | 条件分页获取文献资产列表（自动过滤 `Status = 2` 已下架文献） | 仅需 JWT 认证 |
 | `POST /api/knowledge/book` | 新增文献 | `system:knowledge:create` |
 | `PUT /api/knowledge/book/{id}` | 修改文献 | `system:knowledge:edit` |
 | `DELETE /api/knowledge/book/{id}` | 删除文献 | `system:knowledge:delete` |
@@ -217,10 +217,10 @@ backend/
 | `POST /api/knowledge/return/self/{logId}` | 普通用户自助归还核销 | 仅需 JWT 认证 |
 
 **核心逻辑**：
-- `GetBookListAsync`：分页查询，按 `CreateTime DESC` 排序，支持 `keyword` 模糊搜索 `Title`/`Isbn`、`category` 精确筛选，使用 `AsNoTracking` 投影
+- `GetBookListAsync`：分页查询，按 `CreateTime DESC` 排序，支持 `keyword` 模糊搜索 `Title`/`Isbn`、`category` 精确筛选，使用 `AsNoTracking` 投影，**自动过滤 `Status = 2`（已下架）的文献**
 - `CreateBookAsync`：校验 `Title`/`Isbn` 非空、ISBN 全局唯一后写入 `SysBook`
 - `UpdateBookAsync`：校验文献存在、ISBN 唯一（排除自身）后更新
-- `DeleteBookAsync`：校验文献存在后物理删除
+- `DeleteBookAsync`：先校验是否有 `LogStatus = 0`（流转中）的记录，如有则提示"当前仍有文献流转在读者手中，无法强行销毁"；若无则**逻辑删除**（更新 `Status = 2`），保留文献档案和所有历史借阅日志
 - `BorrowAsync`：`Serializable` 事务，校验用户状态、逐本校验库存和状态，扣减库存并批量写入 `SysBorrowLog`，任一步失败即回滚
 - `ReturnAsync`：事务内更新 `ActualReturnTime`、`LogStatus = 1`，回滚 `SysBook.Stock += 1`，已归还不可重复入库
 - `GetLogListAsync`：**动态隔离** — 通过 `SysUserRole → SysRoleMenu → SysMenu` 检查当前用户是否拥有 `system:knowledge:adminLog` 权限：管理员查看全量大盘，普通用户强制 `.Where(x => x.UserId == currentUserId)` 仅返回自身数据。查询前批量标记逾期
@@ -230,7 +230,7 @@ backend/
 
 **相关 DTO**：
 - `KnowledgeBookDto`：`id`, `title`, `isbn`, `category`, `price`, `stock`, `status`, `createTime`
-- `KnowledgeBookSaveRequest`（新增/修改共用）：`title`（必填，100 字符）, `isbn`（必填，30 字符，唯一）, `category`（可空，50 字符）, `price`（decimal(10,2)）, `stock`（默认 0）, `status`（`1` 正常流转 / `0` 盘点维护中，默认 `1`）
+- `KnowledgeBookSaveRequest`（新增/修改共用）：`title`（必填，100 字符）, `isbn`（必填，30 字符，唯一）, `category`（可空，50 字符）, `price`（decimal(10,2)）, `stock`（默认 0）, `status`（`1` 正常流转 / `0` 盘点维护中 / `2` 已下架（逻辑删除），默认 `1`）
 - `KnowledgeBorrowRequest`：`userId`, `bookIds[]`, `borrowDays`
 - `KnowledgeSelfBorrowRequest`：`bookIds[]`, `borrowDays`（无 `userId`，由 JWT 自动提取）
 - `KnowledgeBorrowLogDto`：`id`, `bookId`, `bookTitle`, `isbn`, `userId`, `username`, `nickname`, `borrowTime`, `returnTime`, `actualReturnTime`（可空）, `logStatus`（`0` 流转中 / `1` 已归还 / `2` 逾期未还）
@@ -315,7 +315,7 @@ SysUser ──< SysUserRole >── SysRole ──< SysRoleMenu >── SysMenu
 | Category | nvarchar(50) | 可空 |
 | Price | decimal(10,2) | |
 | Stock | int | 默认 0 |
-| Status | tinyint | 默认 1（1=正常流转, 0=盘点维护中） |
+| Status | tinyint | 默认 1（1=正常流转, 0=盘点维护中, 2=已下架（逻辑删除）） |
 | CreateTime | datetime | 默认 `GETDATE()` |
 
 **SysBorrowLog**
@@ -323,7 +323,7 @@ SysUser ──< SysUserRole >── SysRole ──< SysRoleMenu >── SysMenu
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | Id | int PK | 自增 |
-| BookId | int | FK → SysBook.Id，级联删除 |
+| BookId | int | FK → SysBook.Id，**级联删除已禁用**（`DeleteBehavior.Restrict`） |
 | BookTitle | nvarchar(100) | 文献标题快照 |
 | UserId | int | FK → SysUser.Id，级联删除 |
 | Username | varchar(50) | 借阅人账号快照 |
@@ -337,8 +337,8 @@ SysUser ──< SysUserRole >── SysRole ──< SysRoleMenu >── SysMenu
 
 - **用户**：`admin` / `password123`（BCrypt 哈希），昵称 `超级管理员`
 - **角色**：`admin`（超级管理员）、`user`（普通用户）
-- **菜单**：17 条（系统管理 9 条 + 业务中台 8 条）
-- **绑定**：admin 用户 → admin 角色 → 全部 17 条菜单/按钮
+- **菜单**：24 条（系统管理 9 条 + 业务中台 15 条）
+- **绑定**：admin 用户 → admin 角色 → 全部 24 条菜单/按钮；增量更新时会确保 admin 角色正确绑定"个人文献中心"菜单节点
 
 种子数据入口：[`MyAdmin.Infrastructure/DbInitializer.cs`](file:///c:/Users/RISEY/Desktop/Codes/VS Code/Front-End/LVA/backend/MyAdmin.Infrastructure/DbInitializer.cs) 的 `SeedAsync` 方法。
 
