@@ -1012,3 +1012,124 @@ export default api;
 | `POST /api/knowledge/borrow/self` | 仅需 JWT 认证 |
 | `GET /api/knowledge/log/my-list` | 仅需 JWT 认证 |
 | `POST /api/knowledge/return/self/{logId}` | 仅需 JWT 认证 |
+
+---
+
+## 8. Dashboard 首页聚合 (Dashboard)
+
+> 以下接口仅需 JWT 认证，不在 Controller 层使用 `[HasPermission]`。各 Widget 是否返回数据由 Service 根据当前用户权限码动态裁剪；无权限的管理员指标为 `null`，`recentActivities` 无权限时返回 `[]`。
+
+### 8.1 获取首页聚合数据
+
+- **URL**: `GET /api/dashboard`
+- **认证**: 需登录（JWT）
+- **安全**: 用户 ID 从 JWT 自动提取，禁止前端传递 `userId`
+- **说明**:
+  - 单次请求返回指标卡、图表、最近动态、个人最近借阅
+  - 查询前会将已超过 `ReturnTime` 且仍流转中的记录批量标记为 `LogStatus = 2`（与流转审计接口一致）
+  - `DueSoonTotal`：当前用户 `LogStatus = 0` 且应还时间在当前起 **3 天内** 的记录数
+
+**Widget 权限映射**：
+| 数据块 | 权限码 | 无权限时 |
+|--------|--------|----------|
+| `summary.bookTotal`、`summary.stockTotal` | `system:knowledge:bookList` | 字段为 `null` |
+| `summary.borrowedTotal`、`summary.overdueTotal` | `system:knowledge:adminLog` | 字段为 `null` |
+| `summary.userTotal` | `system:user:list` | 字段为 `null` |
+| `summary.roleTotal` | `system:role:list` | 字段为 `null` |
+| `charts.borrowTrend`、`charts.hotCategories`、`charts.logStatusDistribution` | `system:knowledge:adminLog` | 字段为 `null` |
+| `charts.userGrowthTrend` | `system:user:list` | 字段为 `null` |
+| `charts.preferenceCategories` | 仅需登录 | 始终返回（可为空数组） |
+| `summary.currentBorrowTotal` 等个人指标 | 仅需登录 | 始终返回 |
+| `recentActivities` | `system:knowledge:adminLog` | 返回 `[]` |
+| `recentBorrows` | 仅需登录 | 始终返回（可为空数组） |
+
+- **成功响应** (`code: 200`，admin 全权限示例):
+
+```json
+{
+  "code": 200,
+  "message": "操作成功",
+  "data": {
+    "summary": {
+      "bookTotal": 120,
+      "borrowedTotal": 15,
+      "stockTotal": 350,
+      "overdueTotal": 2,
+      "userTotal": 8,
+      "roleTotal": 2,
+      "currentBorrowTotal": 1,
+      "dueSoonTotal": 0,
+      "overdueBorrowTotal": 0,
+      "historyTotal": 5
+    },
+    "charts": {
+      "borrowTrend": [
+        { "date": "2026-05-08", "count": 3 },
+        { "date": "2026-05-09", "count": 0 }
+      ],
+      "hotCategories": [
+        { "category": "计算机", "count": 42 }
+      ],
+      "logStatusDistribution": {
+        "borrowing": 15,
+        "returned": 200,
+        "overdue": 2
+      },
+      "userGrowthTrend": [
+        { "date": "2026-05-08", "count": 1 }
+      ],
+      "preferenceCategories": [
+        { "category": "文学", "count": 3 }
+      ]
+    },
+    "recentActivities": [
+      {
+        "activityType": "borrow",
+        "time": "2026-06-05 14:30:00",
+        "username": "user1",
+        "nickname": "张三",
+        "bookTitle": "深入理解计算机系统"
+      }
+    ],
+    "recentBorrows": [
+      {
+        "id": 10,
+        "bookTitle": "深入理解计算机系统",
+        "borrowTime": "2026-06-05 14:30:00",
+        "returnTime": "2026-06-19 14:30:00",
+        "logStatus": 0
+      }
+    ]
+  }
+}
+```
+
+- **普通用户**（仅 JWT 基础权限）示例：`summary` 中管理员指标均为 `null`，`charts` 中仅 `preferenceCategories` 有值，其余图表字段为 `null`，`recentActivities` 为 `[]`，个人指标与 `recentBorrows` 正常返回。
+
+**DTO 字段说明**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| summary.bookTotal | int? | 文献总数（排除已下架 `Status = 2`） |
+| summary.borrowedTotal | int? | 当前流转中总数 |
+| summary.stockTotal | int? | 可借库存总和 |
+| summary.overdueTotal | int? | 逾期未还总数 |
+| summary.userTotal | int? | 用户总数 |
+| summary.roleTotal | int? | 角色总数 |
+| summary.currentBorrowTotal | int | 当前用户流转中数量 |
+| summary.dueSoonTotal | int | 当前用户即将到期数量（3 天内） |
+| summary.overdueBorrowTotal | int | 当前用户逾期数量 |
+| summary.historyTotal | int | 当前用户已归还数量 |
+| charts.borrowTrend | DashboardTrendPointDto[]? | 近 30 天借阅趋势 |
+| charts.hotCategories | DashboardCategoryStatDto[]? | 热门分类 Top 5 |
+| charts.logStatusDistribution | object? | `borrowing` / `returned` / `overdue` |
+| charts.userGrowthTrend | DashboardTrendPointDto[]? | 近 30 天用户增长 |
+| charts.preferenceCategories | DashboardCategoryStatDto[] | 当前用户阅读偏好（按分类） |
+| recentActivities | DashboardActivityDto[] | `activityType`: `borrow` 或 `return` |
+| recentBorrows | DashboardRecentBorrowDto[] | 当前用户最近 5 条借阅 |
+
+### 8.2 权限码汇总
+
+| 接口 | 权限 |
+|------|------|
+| `GET /api/dashboard` | 仅需 JWT 认证（Widget 按权限码裁剪） |

@@ -237,6 +237,48 @@ backend/
 
 ---
 
+### 2.6 Dashboard 模块（首页聚合）
+
+**Controller**: `MyAdmin.WebApi/Controllers/DashboardController.cs`
+**Service**: `MyAdmin.Service/Implementations/DashboardService.cs`
+**Helper**: `MyAdmin.Service/Helpers/UserPermissionHelper.cs`、`DashboardBuildContext.cs`
+
+| 接口 | 说明 | 权限 |
+|------|------|------|
+| `GET /api/dashboard` | 首页聚合数据（指标卡、图表、动态、最近借阅） | 仅需 JWT 认证 |
+
+**设计原则**：
+- 统一 Dashboard 页面，不按角色写死 `admin` / `user`；由当前用户权限码决定各 Widget 是否填充
+- 用户 ID 从 JWT `ClaimTypes.NameIdentifier` 提取，禁止前端传参
+- 单次请求返回全部数据；无权限的指标为 `null`，列表型 Widget 无权限时返回 `[]`
+
+**Widget 权限映射**：
+
+| Widget | 权限码 |
+|--------|--------|
+| `BookTotal`、`StockTotal` | `system:knowledge:bookList` |
+| `BorrowedTotal`、`OverdueTotal`、`BorrowTrend`、`HotCategories`、`LogStatusDistribution`、`RecentActivities` | `system:knowledge:adminLog` |
+| `UserTotal`、`UserGrowthTrend` | `system:user:list` |
+| `RoleTotal` | `system:role:list` |
+| `CurrentBorrowTotal`、`DueSoonTotal`、`OverdueBorrowTotal`、`HistoryTotal`、`PreferenceCategories`、`RecentBorrows` | 仅需登录 |
+
+**核心逻辑**：
+- `GetDashboardAsync`：一次查询用户权限码 → 批量标记逾期（与 Knowledge 一致）→ 顺序构建 Summary / Charts / RecentActivities / RecentBorrows（避免 DbContext 并发冲突）
+- `DueSoonTotal`：`LogStatus = 0` 且应还时间在当前起 3 天内
+- `BorrowTrend` / `UserGrowthTrend`：最近 30 天按日统计，缺失日期补 `0`
+- `HotCategories`：全库借阅按分类 Top 5；`PreferenceCategories`：当前用户借阅按分类统计
+- `RecentActivities`：最近借阅 + 最近归还各取 10 条合并排序后取 Top 10（需 `system:knowledge:adminLog`）
+- `RecentBorrows`：当前用户最近 5 条借阅记录
+
+**相关 DTO**（`MyAdmin.Core/Dtos/DashboardDtos.cs`）：
+- `DashboardDto`：`summary`, `charts`, `recentActivities`, `recentBorrows`
+- `DashboardSummaryDto`：管理员指标（可空）+ 个人指标（始终有值）
+- `DashboardChartsDto`：`borrowTrend`, `hotCategories`, `logStatusDistribution`, `userGrowthTrend`, `preferenceCategories`
+- `DashboardActivityDto`：`activityType`（`borrow` / `return`）, `time`, `username`, `nickname`, `bookTitle`
+- `DashboardRecentBorrowDto`：`id`, `bookTitle`, `borrowTime`, `returnTime`, `logStatus`
+
+---
+
 ## 3. 数据库核心关系
 
 ### 3.1 实体关系图（简化）
@@ -383,6 +425,10 @@ SysUser ──< SysUserRole >── SysRole ──< SysRoleMenu >── SysMenu
 - 实体为 `SysBook`，但 Controller 路由为 `/api/knowledge/...`
 - Service 方法名前缀为 `Book`（如 `CreateBookAsync`、`GetBookListAsync`）
 - 权限码前缀为 `system:knowledge:...`
+
+**Dashboard 模块特殊命名**：
+- 单接口聚合：`GET /api/dashboard`，Service 方法 `GetDashboardAsync`
+- 不在 Controller 挂载 `[HasPermission]`，Widget 可见性在 Service 内按权限码裁剪
 
 ### 4.4 新增模块 Checklist
 
