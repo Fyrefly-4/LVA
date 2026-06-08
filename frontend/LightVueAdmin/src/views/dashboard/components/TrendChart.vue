@@ -35,12 +35,10 @@
         const xAxisData = rawData.map(item => item.date)
         const seriesData = rawData.map(item => item.count)
 
-        if (chartInstance) {
-            chartInstance.dispose()
+        if (!chartInstance) {
+            chartInstance = echarts.init(chartRef.value)
         }
-
-        chartInstance = echarts.init(chartRef.value)
-        
+       
         const option = {
             grid: {
             top: '12%',
@@ -61,7 +59,7 @@
             },
             xAxis: {
                 type: 'category',
-                data: props.chartData?.dates || [],
+                data: xAxisData,
                 boundaryGap: false,
                 axisLine: {
                     lineStyle: { color: '#dcdfe6' }
@@ -111,7 +109,7 @@
             ]
         }
 
-        chartInstance.setOption(option)
+        chartInstance.setOption(option, true)
     }
 
     const handleResize = () => {
