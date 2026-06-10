@@ -5,7 +5,7 @@
     import { getBorrowLogs, returnBook, getBookList, borrowBooks } from '@/api/knowledge';
     import { getUserList } from '@/api/user'
     import { throttle } from '@/utils/tool'
-import { selfBorrowBooks } from '../../api/knowledge';
+    import { selfBorrowBooks } from '@/api/knowledge';
 
     const tableData = ref([])
     const selectedLogIds = ref([])
@@ -182,6 +182,10 @@ import { selfBorrowBooks } from '../../api/knowledge';
         selectedLogIds.value = selection.map(row => row.id)
     }
 
+    const checkSelectable = (row) => {
+        return row.logStatus != 1
+    }
+
     const handleSizeChange = (val) => {
         queryParams.pageSize = val
         queryParams.pageIndex = 1
@@ -193,7 +197,7 @@ import { selfBorrowBooks } from '../../api/knowledge';
         fetchLogList()
     }
 
-    const handleBatchReturn = async () => {
+    const doHandleBatchReturn = async () => {
         if(selectedLogIds.value.length === 0) return
 
         try {
@@ -215,12 +219,13 @@ import { selfBorrowBooks } from '../../api/knowledge';
         } catch (error) {
             if (error?.toString() !== 'cancel') {
                 console.error('批量核销失败:', error)
-                ElMessage.error('批量核销部分记录时出现异常')
             }
         } finally {
             loading.value = false
         }
     }
+
+    const handleBatchReturn = throttle (doHandleBatchReturn, 2000)
 
 </script>
 
@@ -263,7 +268,9 @@ import { selfBorrowBooks } from '../../api/knowledge';
         </div>
 
         <div class="table-wrapper">
-            <el-table :data="tableData" v-loading="loading" style="width: 100%; margin-top: 15px;" border>
+            <el-table :data="tableData" v-loading="loading" style="width: 100%; margin-top: 15px;" border @selection-change="handleSelectionChange">
+                <el-table-column type="selection" :selectable="checkSelectable" width="55" align="center" fixed="left" />
+                
                 <el-table-column prop="id" label="流水号 (LogID)" width="120" align="center" />
                 <el-table-column prop="username" label="借阅人账号" width="130" show-overflow-tooltip />
                 <el-table-column prop="nickname" label="借阅人昵称" width="130" show-overflow-tooltip />
@@ -278,7 +285,7 @@ import { selfBorrowBooks } from '../../api/knowledge';
                     </template>
                 </el-table-column>    
 
-                <el-table-column prop="logStatus" label="流转状态" width="120" align="center">
+                <el-table-column prop="logStatus" label="流转状态" width="120" fixed="right" align="center">
                     <template #default="scope">
                         <el-tag :type="getStatusTagType(scope.row.logStatus)" effect="dark">
                             {{ getStatusLabel(scope.row.logStatus) }}

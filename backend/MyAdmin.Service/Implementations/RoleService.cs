@@ -110,6 +110,14 @@ public class RoleService : IRoleService
         var role = await _dbContext.SysRoles.FindAsync(id)
             ?? throw new InvalidOperationException("角色不存在");
 
+        if (string.Equals(role.RoleCode, "admin", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("系统内置角色（admin）禁止删除");
+
+        var userCount = await _dbContext.SysUserRoles
+            .CountAsync(ur => ur.RoleId == id);
+        if (userCount > 0)
+            throw new InvalidOperationException($"该角色当前被 {userCount} 个用户使用，请先解除关联后再删除");
+
         _dbContext.SysRoles.Remove(role);
         await _dbContext.SaveChangesAsync();
     }

@@ -195,7 +195,7 @@
                 fetchUserList() //刷新列表
             } catch (error) {
                 console.log('删除失败:', error)
-                ElMessage.error('删除失败，请检查网络或权限')
+                ElMessage.error(error.message || '删除失败，请检查网络或权限')
             }
         }).catch(() => {
             //用户点了取消

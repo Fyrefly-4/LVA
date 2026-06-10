@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -58,7 +59,27 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        // 模型验证失败（JSON 类型不匹配、必填缺失等）统一返回 ApiResponse 格式，而非 ProblemDetails
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var firstError = context.ModelState.Values
+                .SelectMany(v => v.Errors)
+                .FirstOrDefault();
+            var message = string.IsNullOrWhiteSpace(firstError?.ErrorMessage)
+                ? (string.IsNullOrWhiteSpace(firstError?.Exception?.Message)
+                    ? "请求参数无效"
+                    : firstError.Exception.GetBaseException().Message)
+                : firstError.ErrorMessage;
+
+            return new ObjectResult(ApiResponse<object?>.Fail(message, 400))
+            {
+                StatusCode = StatusCodes.Status400BadRequest
+            };
+        };
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -99,6 +120,33 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors("FrontendPolicy");
+
+// 全局异常处理中间件：所有未捕获异常统一包装为 ApiResponse 格式返回，避免前端只看到 "服务器内部错误"
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        if (context.Response.HasStarted)
+            throw; // 响应已开始写入，无法改写
+
+        context.Response.Clear();
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "application/json; charset=utf-8";
+
+        var response = ApiResponse<object?>.Fail(ex.GetBaseException().Message, 500);
+        var jsonOptions = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        };
+        var json = System.Text.Json.JsonSerializer.Serialize(response, jsonOptions);
+        await context.Response.WriteAsync(json);
+    }
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

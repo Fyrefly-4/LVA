@@ -2,6 +2,7 @@
 
     import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
     import * as echarts from 'echarts'
+    import { debounce } from '@/utils/tool'
 
     const props = defineProps({
         title: {
@@ -112,11 +113,13 @@
         chartInstance.setOption(option, true)
     }
 
-    const handleResize = () => {
+    const doHandleResize = () => {
         if (chartInstance) {
             chartInstance.resize()
         }
     }
+
+    const handleResize = debounce(doHandleResize, 150)
 
     //监听异步数据，当后端数据加载成功或改变时，重绘图表
     watch(

@@ -87,11 +87,6 @@
                     borrowDays: 14
                 })
 
-                if (res && res.code === 500) {
-                    ElMessage.error(res.message || '借阅失败，触发系统安全防御规则')
-                    return
-                }
-
                 ElMessage({
                     message: '自助申领成功！文献已顺利流转至您的名下',
                     type: 'success',
@@ -104,9 +99,6 @@
 
             } catch (error) {
                 console.error('自助借阅流转失败:', error)
-
-                const errMsg = error.response?.data?.message || '服务器内部错误，触发防占坑熔断线'
-                ElMessage.error(errMsg)
             } finally {
                 loading.value = false
             }
@@ -133,15 +125,17 @@
             <el-button @click="handleReset">重置</el-button>
 
             <div style="margin-left: auto; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: flex-end;">
-                <span style="font-size: 13px; color: #909399; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;">
+                <span style="font-size: 13px; color: #909399; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;"
+                    :style="{ color: selectedBookIds.length > 5 ? '#F56C6C' : '#909399', fontWeight: selectedBookIds.length > 5 ? 'bold' : 'normal' }"
+                >
                     <el-icon><InfoFilled /></el-icon>
-                    勾选列表左侧方框可批量借阅
+                    {{ selectedBookIds.length > 5 ? '单次申请最多允许借阅 5 本文献！' : '勾选列表左侧方框可批量借阅' }}
                 </span>
 
                 <el-button 
-                type="warning" 
-                :disabled="selectedBookIds.length === 0"
-                @click="handleBorrow(selectedBookIds)"    
+                    :type="selectedBookIds.length > 5 ? 'danger' : 'warning'"
+                    :disabled="selectedBookIds.length === 0 || selectedBookIds.length > 5"
+                    @click="handleBorrow(selectedBookIds)"    
                 >
                     批量申领自助借阅 (已选 {{ selectedBookIds.length }} 本)
                 </el-button>

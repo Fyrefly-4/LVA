@@ -29,7 +29,6 @@
             }
         } catch (error) {
             console.error('Dashboard 载入崩溃:', error)
-            ElMessage.error('读取仪表盘数据时发生异常')
         } finally {
             loading.value = false
         }

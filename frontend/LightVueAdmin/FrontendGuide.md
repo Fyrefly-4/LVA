@@ -2,9 +2,10 @@
 
 ## 项目简介
 
-- **项目定位**：LightVueAdmin 后台管理系统前端（Vue3 单页应用）
+- **项目定位**：LightVueAdmin 后台管理系统前端（Vue3 单页应用），面向图书馆文献资产管理场景
 - **技术栈**：Vue 3 + Vite
 - **UI 框架**：Element Plus
+- **图表库**：ECharts 6（用于 Dashboard 数据可视化）
 - **状态管理方案**：Pinia
 - **路由方案**：Vue Router 5（`createWebHistory` 模式）
 
@@ -18,6 +19,12 @@ src
 ├── router       # 路由配置（静态路由 + 动态路由注入逻辑）
 ├── store        # Pinia 状态管理（当前仅 PermissionStore）
 ├── views        # 页面视图组件，按业务模块分目录
+│   ├── dashboard/components  # Dashboard 子组件（统计卡片、趋势图、饼图、时间线）
+│   ├── knowledge              # 知识库/文献资产管理模块
+│   ├── user                   # 用户管理模块
+│   ├── role                   # 角色管理模块
+│   ├── login                  # 登录页
+│   └── 404                    # 404 页面
 ├── layout       # 布局组件（主框架 + 侧边栏）
 ├── components   # 全局可复用组件（当前为空）
 ├── utils        # 工具函数（Axios 实例封装、防抖/节流）
@@ -33,7 +40,7 @@ src
 | `api/` | 封装后端接口调用，一个模块一个文件，统一从 `utils/request.js` 导入 Axios 实例 |
 | `router/` | 定义静态路由表与路由守卫，路由守卫中完成动态路由的获取与注入 |
 | `store/` | Pinia Store，管理全局状态（权限、菜单、用户信息等） |
-| `views/` | 业务页面组件，按模块独立目录，每个模块一个 `index.vue` |
+| `views/` | 业务页面组件，按模块独立目录；复杂页面（如 Dashboard）可含 `components/` 子目录存放局部组件 |
 | `layout/` | 后台主布局框架（侧边栏 + 顶栏 + 内容区），包含 Sidebar 组件 |
 | `components/` | 全局通用组件（当前为空，项目暂无跨模块复用组件） |
 | `utils/` | 基础设施工具：Axios 封装（拦截器、Loading）、通用函数（防抖、节流） |
@@ -129,6 +136,8 @@ API 按业务模块拆分为独立文件，位于 `src/api/`：
 | `auth.js` | 认证模块 | `POST /api/auth/login` |
 | `user.js` | 用户管理 | 分页查询、新增、编辑、删除 |
 | `role.js` | 角色管理 | 分页查询、全量查询、新增、编辑、删除、获取角色权限、保存角色权限 |
+| `dashboard.js` | 仪表盘 | `GET /api/dashboard`，权限驱动型聚合数据接口（根据角色自动裁剪返回字段） |
+| `knowledge.js` | 知识库/文献资产管理 | 文献 CRUD、批量指派借阅、归还入库、流转审计日志、用户自助借阅/归还、个人借阅历史（共 10 个接口） |
 
 ### 新增模块规范
 
@@ -137,6 +146,7 @@ API 按业务模块拆分为独立文件，位于 `src/api/`：
 3. 每个接口封装为一个具名导出的函数。
 4. GET 请求参数使用 `params` 字段，POST/PUT 请求参数使用 `data` 字段。
 5. 登录等特殊接口需显式设置 `showLoading: false` 以避免全局 Loading 干扰。
+6. 建议在函数上方以 JSDoc 格式注释接口用途与参数说明。
 
 **示例结构**：
 ```js
@@ -165,10 +175,23 @@ export const deleteXxx = (id) => request({ url: `/api/xxx/${id}`, method: 'delet
 | 模块 | 页面位置 | 对应 API 模块 | 权限码前缀 | 说明 |
 |------|---------|-------------|-----------|------|
 | 登录 | `views/login/index.vue` | `api/auth.js` | — | 白名单页面，不依赖权限 |
-| Dashboard | `views/dashboard/index.vue` | — | — | 静态首页，登录后默认展示 |
+| Dashboard | `views/dashboard/index.vue` + `components/` 下 4 个子组件 | `api/dashboard.js` | — | 权限驱动型大盘：管理员看全站数据+图表+情报流，普通用户看个人指标+偏好分析 |
 | 用户管理 | `views/user/index.vue` | `api/user.js`、`api/role.js`（角色字典） | `system:user:*` | 用户列表、增删改、分配角色 |
 | 角色管理 | `views/role/index.vue` | `api/role.js` | `system:role:*` | 角色列表、增删改、分配权限 |
+| 文献资产管理 | `views/knowledge/book.vue` | `api/knowledge.js` | `system:knowledge:*` | 管理员：文献资产列表、添加/编辑/删除（含表单校验） |
+| 文献查阅大厅 | `views/knowledge/hall.vue` | `api/knowledge.js` | — | 普通用户：浏览文献、单本/批量自助借阅（勾选左侧复选框） |
+| 个人借阅中心 | `views/knowledge/personal.vue` | `api/knowledge.js` | — | 普通用户：查看个人借阅历史、按流转状态筛选、自助归还 |
+| 流转审计中心 | `views/knowledge/audit-log.vue` | `api/knowledge.js` | `system:knowledge:*` | 管理员：全站流转日志、批量指派借阅（穿梭框选文献）、批量核销归还 |
 | 404 | `views/404/index.vue` | — | — | 路由未匹配时展示 |
+
+### Dashboard 子组件
+
+| 子组件 | 文件路径 | 说明 |
+|--------|---------|------|
+| StatisticCards | `views/dashboard/components/StatisticCards.vue` | 核心指标卡片（全员 4 张 + 管理员额外 5 张，按权限显隐） |
+| TrendChart | `views/dashboard/components/TrendChart.vue` | ECharts 折线图（借阅趋势 / 用户增长趋势） |
+| PreferencePie | `views/dashboard/components/PreferencePie.vue` | ECharts 饼图（个人借阅偏好 / 全站流转状态分布） |
+| ActivityTimeline | `views/dashboard/components/ActivityTimeline.vue` | 时间线组件（全站实时情报流 / 个人最近借阅快照） |
 
 ### 权限码列表（实际使用）
 
@@ -180,6 +203,11 @@ export const deleteXxx = (id) => request({ url: `/api/xxx/${id}`, method: 'delet
 - `system:role:edit` — 编辑角色按钮
 - `system:role:delete` — 删除角色按钮
 - `system:role:assignPerm` — 角色分配权限按钮
+- `system:knowledge:create` — 添加文献按钮
+- `system:knowledge:edit` — 编辑文献按钮
+- `system:knowledge:delete` — 删除文献按钮
+- `system:knowledge:borrow` — 批量指派借阅按钮
+- `system:knowledge:return` — 归还入库按钮
 
 **权限控制方式**：通过 `v-has-perm` 自定义指令（`src/directives/hasPerm.js`）控制按钮/元素显隐，不满足权限时直接 `removeChild` 移除 DOM 元素。
 
@@ -191,16 +219,23 @@ export const deleteXxx = (id) => request({ url: `/api/xxx/${id}`, method: 'delet
 
 ### 列表页统一结构
 
-1. **搜索区**：`el-input` + `el-button`（搜索/重置），回车键触发搜索（`@keyup.enter`）。
+1. **搜索区**：`el-input` + 可选 `el-select` 分类筛选 + `el-button`（搜索/重置），回车键触发搜索（`@keyup.enter`）。
 2. **操作区**：新增按钮放置在搜索区右侧（`margin-left: auto`），使用 `v-has-perm` 控制。
-3. **表格区**：`el-table`，操作列 `fixed="right"`，编辑/删除按钮使用 `v-has-perm` 控制。
-4. **分页区**：`el-pagination`，`page-sizes` 统一为 `[5, 10, 20, 50]`，页码改变时重置到第一页。
+3. **表格区**：`el-table`，操作列 `fixed="right"`，编辑/删除按钮使用 `v-has-perm` 控制。数据量较大时可加 `v-loading`。
+4. **分页区**：`el-pagination`，标准 `page-sizes` 为 `[5, 10, 20, 50]`；特殊模块（如审计日志）可使用 `[10, 20, 50, 100]`。页码改变时重置到第一页。
+
+### Dashboard 仪表盘结构
+
+1. 页面级 `v-loading` 覆盖整个容器。
+2. 数据通过 `onMounted` 调用单一聚合接口获取，按模块 props 分发给子组件。
+3. ECharts 图表组件内部自行管理实例的创建与销毁（`echarts.init` + `dispose`），监听 `chartData` 变化自动刷新。
+4. 图表实例挂载到 `ref` 上，组件销毁时（`onBeforeUnmount`）调用 `dispose()` 释放资源。
 
 ### 新增/编辑弹窗统一
 
 - 使用 `el-dialog`，`v-model` 控制显隐。
 - `isEdit` 标记区分新增与编辑模式，弹窗标题动态切换。
-- 表单使用 `el-form`，`label-width` 统一 80~90px。
+- 表单使用 `el-form`，`label-width` 统一 80~120px。需要校验时配置 `:rules` 并在提交前调用 `formRef.value.validate()`。
 - 编辑模式下先深拷贝 `row` 数据到 `formModel`，避免污染表格。
 - 提交按钮使用 `throttle` 节流（1500ms CD），防止重复提交。
 - 提交成功后关闭弹窗并刷新列表。
@@ -209,7 +244,18 @@ export const deleteXxx = (id) => request({ url: `/api/xxx/${id}`, method: 'delet
 
 - 使用 `ElMessageBox.confirm`，类型为 `warning`。
 - 提示文案包含被删除对象的名称，注明"此操作不可逆"。
-- 确认后调用接口，成功后 `ElMessage.success` 提示并刷新列表。
+- 确认后调用接口，成功后 `ElMessage.success` 提示并刷新列表。若删除最后一条记录且当前页 > 1，`pageIndex` 自动减 1。
+
+### 批量操作
+
+- 通过 `el-table` 的 `@selection-change` 获取选中行，使用 `el-button` 触发批量操作。
+- 按钮在未选中时 `:disabled`，文案动态显示已选数量。
+- 批量归还使用 `Promise.allSettled` 并发处理，避免单条失败阻塞。
+
+### 穿梭框指派
+
+- 使用 `el-transfer` 实现文献与用户的双向挑选，数据源通过 `getBookList` + `getUserList` 拉取全量字典。
+- `el-transfer` 的 `data` 需包装为 `{ key, label, disabled }` 格式。
 
 ### 消息提示统一
 
@@ -221,6 +267,7 @@ export const deleteXxx = (id) => request({ url: `/api/xxx/${id}`, method: 'delet
 
 - 按钮/元素级别使用 `v-has-perm` 指令，传入权限码字符串。
 - 角色管理页中 `admin` 角色（`roleCode === 'admin'` 或 `id === 1`）的编辑/删除/分配权限按钮直接 `disabled`，不以权限码控制。
+- 某些列表页面（如查阅大厅、个人借阅中心）面向所有登录用户开放，不使用权限控制。
 
 ### 其他约定
 
@@ -228,3 +275,5 @@ export const deleteXxx = (id) => request({ url: `/api/xxx/${id}`, method: 'delet
 - 删除最后一条记录后，若当前页已无数据，`pageIndex` 自动减 1。
 - 表单提交使用 `throttle` 包裹（`src/utils/tool.js`），默认 CD 1.5s。
 - 所有接口函数从 `api/` 目录导入，不在页面内直接调用 `request`。
+- ECharts 图表配置统一使用 `grid` + `tooltip` 结构化布局，色值从 Element Plus 色系中选取。
+- 分类字典（如文献分类 `BOOK_CATEGORIES`）以常量形式在页面内定义，不单独请求接口（待确认：是否后续由后端统一管理）。

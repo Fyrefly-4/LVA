@@ -140,7 +140,6 @@
                 fetchRoleList() //刷新列表
             } catch (error) {
                 console.log('删除失败:', error)
-                ElMessage.error('删除失败，请检查网络或权限')
             }
         }).catch(() => {
             //用户点了取消
@@ -205,7 +204,6 @@
 
         } catch (error) {
             console.log('获取权限树失败', error)
-            ElMessage.error('获取权限分配数据失败')
         } finally {
             treeLoading.value = false
         }

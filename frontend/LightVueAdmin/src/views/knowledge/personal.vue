@@ -27,7 +27,6 @@
             total.value = res.total || 0
         } catch (error) {
             console.error('加载个人借阅账本失败:', error)
-            ElMessage.error('无法加载您的借阅历史记录')
         } finally {
             loading.value = false
         }
@@ -69,23 +68,18 @@
             )
 
             loading.value = true
-            const res = await selfReturnBook(logId)
-            
-            if (res && res.code === 500) {
-                ElMessage.error(res.message || '归还失败，无权操作此记录')
-                return
-            }
 
+            await selfReturnBook(logId)
+            
             ElMessage.success('文献资产已安全归还入库，账本核销完毕！')
 
             await fetchBorrowLogs()
 
         } catch (error) {
-            if (error !== 'cancel') {
-                console.error('自助归还流转异常:', error)
-                const errMsg = error.response?.data?.message || '触发重复归还防护网网关'
-                ElMessage.error(errMsg)
-            }
+            if (error === 'cancel' || error && error.message === 'cancel') return
+
+            console.error('自助归还流转异常详情:', error)
+            
         } finally {
             loading.value = false
         }

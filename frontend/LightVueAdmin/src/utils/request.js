@@ -116,7 +116,7 @@ service.interceptors.response.use(
     let errorMsg = message || '系统异常'
     switch (code) {
       case 400:
-        errorMsg = '请求参数错误'
+        if (!message) errorMsg = '请求参数错误'
         break
 
       case 401:
@@ -129,16 +129,16 @@ service.interceptors.response.use(
         break
 
       case 403:
-        errorMsg = '您没有权限执行当前操作'
+        if (!message) errorMsg = '您没有权限执行当前操作'
         break
 
       case 500:
-        errorMsg = '服务器内部错误'
+        if (!message) errorMsg = '服务器内部错误'
         break
     }
 
     ElMessage.error(errorMsg)
-    return Promise.reject(new Error(message || 'Error'))
+    return Promise.reject(new Error(errorMsg))
   },
   (error) => {
     // 网络彻底断连、后端没起来、404/500 等全部死在这里

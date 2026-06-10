@@ -2,6 +2,7 @@
 
     import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
     import * as echarts from 'echarts'
+    import { debounce } from '@/utils/tool'
 
     const props = defineProps({
         title: {
@@ -101,11 +102,13 @@
         pieInstance.setOption(option)
     }
 
-    const handleResize = () => {
+    const doHandleResize = () => {
         if (pieInstance) {
             pieInstance.resize()
         }
     }
+
+    const handleResize = debounce(doHandleResize, 150)
 
     watch(
         () => props.chartData,

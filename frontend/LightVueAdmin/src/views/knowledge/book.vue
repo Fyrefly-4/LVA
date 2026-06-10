@@ -190,7 +190,6 @@
                 fetchBookList()
             } catch (error) {
                 console.error('删除失败:', error)
-                ElMessage.error('删除失败，请检查网络或权限')
             }
         }).catch(() => {
             ElMessage.info('已取消操作')

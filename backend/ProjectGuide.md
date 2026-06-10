@@ -33,7 +33,7 @@ backend/
 
 ### 1.4 统一响应格式
 
-所有接口 HTTP 状态码均为 `200`，业务状态通过 `code` 字段区分：
+所有接口 HTTP 状态码均为 `200`（部分错误场景如权限、验证失败例外），业务状态通过 `code` 字段区分：
 
 ```json
 {
@@ -43,12 +43,21 @@ backend/
 }
 ```
 
-| code | 含义 |
-|------|------|
-| 200  | 成功 |
-| 401  | 未认证 |
-| 403  | 无权限 |
-| 500  | 业务失败 |
+| code | HTTP 状态码 | 含义 |
+|------|-------------|------|
+| 200  | 200         | 成功 |
+| 400  | 400         | 请求参数无效/模型绑定失败（自动由 `ApiBehaviorOptions` 统一格式，不再返回 `ProblemDetails`） |
+| 401  | 401         | 未认证（`[HasPermission]` 鉴权失败或 JWT 无效） |
+| 403  | 403         | 无权限（`[HasPermission]` 权限码不匹配） |
+| 500  | 200 或 500  | 业务失败/服务端异常（Controller `try/catch` 捕获或全局异常中间件捕获，均返回 `ApiResponse` 格式） |
+
+**错误处理机制（代码实现级）**：
+
+- **Controller 层**：各接口方法内部 `try/catch`，业务校验失败（角色不存在、文献被借阅中、ISBN 重复等）通过 `throw InvalidOperationException` 抛出，`catch` 块返回 `ApiResponse.Fail(ex.Message)`
+- **权限过滤器**：`[HasPermission]` 内部查询权限码时发生 DB 异常，自动返回 `ApiResponse.Fail(ex.GetBaseException().Message, 500)`，不再冒泡到 ASP.NET 默认错误页
+- **模型验证**：请求体 JSON 无法绑定到 DTO（字段类型不匹配、必填缺失）时，通过 `ApiBehaviorOptions.InvalidModelStateResponseFactory` 改写为 `ApiResponse` 格式（`code: 400`），不再返回默认的 `ProblemDetails`
+- **全局异常中间件**：所有从中间件管线/过滤器/Controller 漏出的未捕获异常，统一包装为 `ApiResponse` JSON（`code: 500`，`message` 取 `ex.GetBaseException().Message` 以穿透 `DbUpdateException` 等包装异常的内层真实错误）
+- **异常消息穿透**：统一使用 `ex.GetBaseException().Message` 读取最内层异常消息，避免 `DbUpdateException`、`DbUpdateConcurrencyException` 等 EF Core 包装异常仅显示 "An error occurred while updating the entries" 这类无意义信息
 
 ### 1.5 权限模型
 

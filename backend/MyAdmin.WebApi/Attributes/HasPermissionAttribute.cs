@@ -32,36 +32,46 @@ public sealed class HasPermissionFilter : IAsyncActionFilter
 
     public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
     {
-        var userIdClaim = context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (!int.TryParse(userIdClaim, out var userId))
+        try
         {
-            context.Result = new ObjectResult(ApiResponse<object?>.Fail("Unauthenticated", 401))
+            var userIdClaim = context.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdClaim, out var userId))
             {
-                StatusCode = StatusCodes.Status401Unauthorized
-            };
-            return;
+                context.Result = new ObjectResult(ApiResponse<object?>.Fail("Unauthenticated", 401))
+                {
+                    StatusCode = StatusCodes.Status401Unauthorized
+                };
+                return;
+            }
+
+            // 匹配 SysMenu.PermCode（含 MenuType = 2 按钮级），与 GetInfo 吐出的 permissions 口径一致
+            var hasPermission = await (
+                from userRole in _dbContext.SysUserRoles
+                join roleMenu in _dbContext.SysRoleMenus on userRole.RoleId equals roleMenu.RoleId
+                join menu in _dbContext.SysMenus on roleMenu.MenuId equals menu.Id
+                where userRole.UserId == userId
+                      && menu.Status == 1
+                      && menu.PermCode == _permission
+                select menu.Id)
+                .AnyAsync();
+
+            if (!hasPermission)
+            {
+                context.Result = new ObjectResult(ApiResponse<object?>.Fail("Forbidden", 403))
+                {
+                    StatusCode = StatusCodes.Status403Forbidden
+                };
+                return;
+            }
+
+            await next();
         }
-
-        // 匹配 SysMenu.PermCode（含 MenuType = 2 按钮级），与 GetInfo 吐出的 permissions 口径一致
-        var hasPermission = await (
-            from userRole in _dbContext.SysUserRoles
-            join roleMenu in _dbContext.SysRoleMenus on userRole.RoleId equals roleMenu.RoleId
-            join menu in _dbContext.SysMenus on roleMenu.MenuId equals menu.Id
-            where userRole.UserId == userId
-                  && menu.Status == 1
-                  && menu.PermCode == _permission
-            select menu.Id)
-            .AnyAsync();
-
-        if (!hasPermission)
+        catch (Exception ex)
         {
-            context.Result = new ObjectResult(ApiResponse<object?>.Fail("Forbidden", 403))
+            context.Result = new ObjectResult(ApiResponse<object?>.Fail(ex.GetBaseException().Message, 500))
             {
-                StatusCode = StatusCodes.Status403Forbidden
+                StatusCode = StatusCodes.Status500InternalServerError
             };
-            return;
         }
-
-        await next();
     }
 }
