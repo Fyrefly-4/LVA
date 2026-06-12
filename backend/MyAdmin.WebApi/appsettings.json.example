@@ -3,7 +3,7 @@
     "DefaultConnection": "Server=localhost;Database=MyAdminDb;Trusted_Connection=True;TrustServerCertificate=True;"
   },
   "Jwt": {
-    "SecretKey": "MyAdmin_Super_Secret_Key_At_Least_32_Chars!",
+    "SecretKey": "在这里替换为至少 32 字节的随机密钥（建议使用 Base64；详见项目 README 的「本地运行配置」说明；切勿把真实密钥提交到 Git 仓库）",
     "Issuer": "MyAdmin.WebApi",
     "Audience": "MyAdmin.Client",
     "ExpirationMinutes": 480

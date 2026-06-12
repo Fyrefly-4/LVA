@@ -12,6 +12,7 @@
     const selectedBookIds = ref([])
 
     const myBorrowedBookIds = ref([])
+    const myOverdueBookIds = ref([])
 
     const queryParams = reactive({
         pageIndex: 1,
@@ -29,11 +30,12 @@
             const borrowRes = await getMyBorrowLogs({
                 pageIndex: 1, 
                 pageSize: 100, 
-                logStatus: 0
             })
             if (borrowRes && borrowRes.items) {
-                //提取已经借阅的 bookId
-                myBorrowedBookIds.value = borrowRes.items.map(log => log.bookId)
+                //提取已经借阅和已逾期的 bookId
+                myBorrowedBookIds.value = borrowRes.items.filter(log => log.logStatus === 0).map(log => log.bookId)
+
+                myOverdueBookIds.value = borrowRes.items.filter(log => log.logStatus === 2).map(log => log.bookId)
             }
 
             // 拉取大厅表格
@@ -151,7 +153,8 @@
                 @selection-change="handleSelectionChange"
             >
                 <el-table-column type="selection" width="55" align="center" fixed="left"
-                    :selectable="(row) => !myBorrowedBookIds.includes(row.id) && row.stock > 0"
+                    :selectable="(row) => !myBorrowedBookIds.includes(row.id)
+                                          && !myOverdueBookIds.includes(row.id)"
                 />
         
                 <el-table-column prop="id" label="资产ID" width="100" align="center" />
@@ -176,6 +179,15 @@
                             disabled
                         >
                             已在借阅中
+                        </el-button>
+
+                        <el-button
+                            v-else-if="myOverdueBookIds.includes(scope.row.id)"
+                            type="danger"
+                            size="small"
+                            disabled
+                        >
+                            逾期未归还
                         </el-button>
 
                         <el-button

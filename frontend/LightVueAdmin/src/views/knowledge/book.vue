@@ -9,7 +9,11 @@
     const BOOK_CATEGORIES = [
         { label: '技术文献', value: '技术文献' },
         { label: '行业报告', value: '行业报告' },
-        { label: '外文资料', value: '外文资料' }
+        { label: '外文资料', value: '外文资料' }, 
+        { label: '经济管理', value: '经济管理' },
+        { label: '艺术设计', value: '艺术设计' },
+        { label: '人文社科', value: '人文社科' },
+        { label: '通用基础', value: '通用基础' }
     ]
 
     // 储存表格数据与大盘总数

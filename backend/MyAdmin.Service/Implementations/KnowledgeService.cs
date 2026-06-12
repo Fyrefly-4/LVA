@@ -164,15 +164,36 @@ public class KnowledgeService : IKnowledgeService
             if (user.Status != 1)
                 throw new InvalidOperationException("借阅人状态异常，无法指派借阅");
 
+            // C. 单人额度熔断：当前流转中(0) + 逾期未还(2) 的数量 + 本次拟借数量 > 5
+            var currentBorrowingCount = await _dbContext.SysBorrowLogs
+                .CountAsync(l => l.UserId == request.UserId && (l.LogStatus == 0 || l.LogStatus == 2));
+            if (currentBorrowingCount + request.BookIds.Count > 5)
+                throw new InvalidOperationException($"借阅人[{user.Username}]借阅额度已满（单人上限 5 本），请先归还现有文献。");
+
+            // D. 严格禁止重复借阅（流转中或逾期未还的同一本书均不可再次借阅）
+            foreach (var bookId in request.BookIds)
+            {
+                if (bookId <= 0)
+                    throw new InvalidOperationException("存在无效的文献 ID");
+
+                var alreadyBorrowed = await _dbContext.SysBorrowLogs
+                    .AnyAsync(l => l.UserId == request.UserId && l.BookId == bookId && (l.LogStatus == 0 || l.LogStatus == 2));
+                if (alreadyBorrowed)
+                {
+                    var bookTitle = await _dbContext.SysBooks
+                        .Where(b => b.Id == bookId)
+                        .Select(b => b.Title)
+                        .FirstOrDefaultAsync() ?? $"ID:{bookId}";
+                    throw new InvalidOperationException($"借阅人已借阅过文献《{bookTitle}》，在归还前无需重复借阅。");
+                }
+            }
+
             var now = DateTime.Now;
             var returnTime = now.AddDays(request.BorrowDays);
             var logs = new List<SysBorrowLog>();
 
             foreach (var bookId in request.BookIds)
             {
-                if (bookId <= 0)
-                    throw new InvalidOperationException("存在无效的文献 ID");
-
                 var book = await _dbContext.SysBooks
                     .FirstOrDefaultAsync(b => b.Id == bookId)
                     ?? throw new InvalidOperationException($"文献不存在：{bookId}");
@@ -309,20 +330,20 @@ public class KnowledgeService : IKnowledgeService
         if (request.BorrowDays <= 0)
             throw new InvalidOperationException("借阅天数必须大于 0");
 
-        // C. 单人额度熔断：当前流转中数量 + 本次拟借数量 > 5
+        // C. 单人额度熔断：当前流转中(0) + 逾期未还(2) 的数量 + 本次拟借数量 > 5
         var currentBorrowingCount = await _dbContext.SysBorrowLogs
-            .CountAsync(l => l.UserId == currentUserId && l.LogStatus == 0);
+            .CountAsync(l => l.UserId == currentUserId && (l.LogStatus == 0 || l.LogStatus == 2));
         if (currentBorrowingCount + request.BookIds.Count > 5)
             throw new InvalidOperationException("您的借阅额度已满（单人上限 5 本），请先归还现有文献。");
 
-        // D. 严格禁止重复借阅
+        // D. 严格禁止重复借阅（流转中或逾期未还的同一本书均不可再次借阅）
         foreach (var bookId in request.BookIds)
         {
             if (bookId <= 0)
                 throw new InvalidOperationException("存在无效的文献 ID");
 
             var alreadyBorrowed = await _dbContext.SysBorrowLogs
-                .AnyAsync(l => l.UserId == currentUserId && l.BookId == bookId && l.LogStatus == 0);
+                .AnyAsync(l => l.UserId == currentUserId && l.BookId == bookId && (l.LogStatus == 0 || l.LogStatus == 2));
             if (alreadyBorrowed)
             {
                 var bookTitle = await _dbContext.SysBooks
