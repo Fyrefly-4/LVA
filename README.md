@@ -1,6 +1,6 @@
 # LightVueAdmin
 
-基于 RBAC 的 Vue 3 管理系统，用于图书馆文献资产和借阅流转管理。
+基于 RBAC 的 Vue 3 + NET 8 管理系统，用于文献资产和借阅流转管理。
 
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js)](https://vuejs.org/)
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite)](https://vitejs.dev/)
@@ -8,7 +8,7 @@
 
 ## 项目简介
 
-LightVueAdmin 是一个面向图书馆文献资产管理的后台系统。前端负责权限初始化、动态路由和按钮级权限控制；后端提供 JWT 认证和 REST API
+LightVueAdmin 是一个面向文献资产管理的后台系统。前端负责权限初始化、动态路由和按钮级权限控制；后端提供 JWT 认证和 REST API
 
 核心功能：后端控制菜单 → 前端动态注册路由 → 按钮/接口双端校验 + 文献流转闭环 + 权限驱动 Dashboard
 
