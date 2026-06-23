@@ -108,6 +108,7 @@ api/* → Axios → 后端 REST API
 ```bash
 cd backend/MyAdmin.WebApi
 cp appsettings.json.example appsettings.json   # 配置数据库连接
+#可参照backend/MyAdmin.WebApi/appsettings.json.example
 dotnet run
 # 默认地址：http://localhost:5014
 ```
@@ -127,6 +128,16 @@ npm run dev
 2. 创建普通用户并分配 `user` 角色 → 仅看到文献目录、个人中心和个人 Dashboard 指标
 
 ---
+
+## 项目截图
+
+### 首页-Dashboard
+
+展示系统运营数据、借阅趋势及个人借阅统计信息，不同角色可查看不同数据内容。
+
+![Dashboard](./docs/screenshots/dashboard_1.png)
+
+更多界面截图（RBAC 权限配置、动态菜单、文献流转审计等）见 (docs/screenshots/)
 
 
 ## 项目演进
