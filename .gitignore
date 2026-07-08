@@ -35,6 +35,7 @@ Scripts/
 WRITEME.md
 ProjectAnalysis.md
 BackendBusinessSummary.md
+TS_Refactoring_Guide.md
 
 # ====================== .NET C# 后端 忽略规则 ======================
 # .NET 编译输出目录
@@ -51,7 +52,7 @@ obj/
 *.sw?
 *.tmp
 
-# ★★★ ASP.NET Core 配置文件（含 JWT 密钥 / 数据库密码，禁止提交）★★★
+# ASP.NET Core 配置文件（含 JWT 密钥 / 数据库密码）
 **/appsettings.json
 **/appsettings.Development.json
 **/appsettings.Staging.json

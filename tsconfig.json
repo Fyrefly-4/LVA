@@ -1,0 +1,35 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "useDefineForClassFields": true,
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": false,                 // 关闭总严格模式，防止未改动JS大面积报警
+
+        /* 显式开启关键子防线，在局部建立TS规范 */
+        "noImplicitAny": true,           // 强制参数声明类型，不允许隐式any
+        "strictNullChecks": true,        // 强制空指针安全检查，避免经典运行时错误
+        "noImplicitThis": true,          // 检查 this 指向，防止上下文丢失
+        
+        "jsx": "preserve",
+        "importHelpers": true,
+        "experimentalDecorators": true,
+        "allowJs": true,                 // 允许 JS 与 TS 共存
+        "sourceMap": true,
+        "resolveJsonModule": true,
+        "isolatedModules": true,
+        "esModuleInterop": true,
+        "lib": ["ESNext", "DOM"],
+        "skipLibCheck": true,
+        "paths": {
+            "@/*": ["./src/*"]
+        }
+    },
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.d.ts",
+        "src/**/*.tsx",
+        "src/**/*.vue"
+    ],
+    "exclude": ["node_modules", "dist"]
+}
